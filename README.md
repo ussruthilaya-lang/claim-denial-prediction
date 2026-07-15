@@ -1,73 +1,110 @@
 # From Codes to Context: Claim Denial Prediction
 
-CS6140 · Northeastern University · Summer 2026
+CS6140 · Khoury College · Northeastern University · Summer 2026
 
-A four-phase progressive pipeline for predicting medical claim denials — from
-structured-data baselines to a retrieval-augmented, LLM-assisted decision layer.
+Nainica Dasari · Het Suryakant Prajapati · Sruthilaya Umasankari Soma Shanmuga Sundaram
 
-## Why this repo is structured this way
+## Problem
 
-Most student ML projects fail production-readiness for one reason: every phase
-is a standalone notebook, nobody can run anyone else's code, and there's no
-single place that says "here's how a claim actually flows through the system."
+Medical claim denials cost U.S. hospitals ~$19.7B/year. Existing automated
+denial prediction relies only on structured billing fields (ICD-10, CPT,
+insurance type, submission intervals) and ignores clinical narrative in
+physician notes. This project asks whether unstructured clinical text and
+historical denial patterns improve denial prediction over structured-only
+baselines.
 
-This repo is built like a real ML platform, not four disconnected notebooks:
+## Scope
 
-- **Each phase is an installable Python package** (`phase1_baseline/`,
-  `phase2_gbm_shap/`, `phase3_clinicalbert/`, `phase4_rag_agentic/`) with its
-  own `src/`, `tests/`, and `requirements.txt`. This means Phase 2 can import
-  Phase 1's preprocessing without copy-pasting code, and each teammate can
-  `pip install -e .` only what they need.
-- **`shared/`** holds the data schemas, config loading, and utility code that
-  every phase depends on (e.g. the claim record schema, the AUROC/F1 eval
-  harness). One source of truth prevents four slightly-different definitions
-  of "what is a claim" from drifting apart.
-- **`mlops_platform/`** is the MLOps layer that turns "four models" into "one
-  system": Docker Compose for local dev, MLflow for experiment tracking so we
-  can compare AUROC across all four phases in one place, a FastAPI serving
-  layer that wraps whichever model is "current," and GitHub Actions CI so
-  broken code never merges.
-- **Phase ownership is explicit** (see below) but the platform layer is
-  everyone's dependency — this is intentional. In production ML teams, the
-  platform is the thing that outlives any one model.
+The full plan is four progressive phases (below), each independently
+evaluable, each producing AUROC/F1 comparable across phases in a final
+ablation study. **All four phases are in scope for the course deliverable** —
+there is no reduced "core" set, as promised in the proposal.
 
-## Team ownership
+What's simplified is *when infra gets built*, not the modeling scope:
+- No Docker/Terraform/CI/MLflow up front — that was solving a problem we
+  don't have yet.
+- The one platform piece that stays in scope is a **presentation/demo site**
+  (owned by Sruthilaya, built last): a lightweight app that pulls each
+  phase's saved predictions, SHAP output, and retrieval examples into one
+  place to visually sell the idea at the final presentation. It's a demo
+  layer over finished results, not production serving infra — see
+  [TRACKER.md](TRACKER.md).
 
-| Owner | Scope | Deliverable |
-|---|---|---|
-| **You (platform + Phase 4)** | `mlops_platform/`, `shared/`, `phase4_rag_agentic/` | MLOps infra (Docker, CI, MLflow, serving) + FAISS retrieval-augmented layer + GPT-4 zero-shot baseline |
-| Teammate B | `phase1_baseline/`, `phase2_gbm_shap/` | LR/DT baseline reproduction + XGBoost/LightGBM + SHAP |
-| Teammate C | `phase3_clinicalbert/` | ClinicalBERT embeddings over MIMIC-IV-Note, fused with structured features |
+## Phases
 
-Every phase reads from `shared/schemas` and writes metrics through
-`shared/utils/eval.py` so results are directly comparable in the final
-ablation study — that comparability is the whole point of the "progressive"
-design in the proposal.
+Each phase owner is responsible for their model **and** the evaluation rigor
+below (cost-sensitive metrics, calibration, error analysis) — see
+[Evaluation & rigor](#evaluation--rigor).
 
-## Quickstart
+| Phase | Data | Method | Owner |
+|---|---|---|---|
+| 1 — Structured baseline | Kaggle synthetic claims (davidcsullivan) | Reproduce Hiremath et al.: logistic regression + decision tree, SMOTE, backward elimination, stratified k-fold CV | Het |
+| 2 — Gradient boosting + SHAP | Same as Phase 1 | XGBoost + LightGBM, SHAP attribution per claim | Nainica |
+| 3 — Clinical text | MIMIC-IV-Note (PhysioNet), proxy denial labels via ICD-10/CPT | ClinicalBERT embeddings concatenated with structured features, retrained Phase 2 classifier; GPT-4 zero-shot baseline for comparison | Het |
+| 4 — Retrieval-augmented | Synthea (MITRE), fault-injected denial labels (~19% prevalence, calibrated to CMS ACA 2024 stats) | FAISS index over historical claims; top-k similar past denials injected as context at inference | Sruthilaya |
 
-```bash
-cp .env.example .env
-make setup          # creates venv, installs shared + platform deps
-make up              # docker compose up: mlflow, postgres (feature store), api
-make test            # runs pytest across all phase packages
-```
+Ownership is split so each person owns one "classical" and one "advanced"
+piece where possible, and so no one person is stuck doing only baseline
+work or only novel work — Phase 3 depends on Phase 2's classifier, so Het
+(Phase 3) and Nainica (Phase 2) coordinate at that handoff. Sruthilaya's
+Phase 4 plus the demo site is the platform-facing track, sized to match a
+single phase plus a scoped-down (not full MLOps) presentation layer.
 
-See `docs/architecture/` for system diagrams and `docs/adr/` for decisions
-(e.g. why FAISS over pgvector, why GCP over AWS) with the reasoning kept
-next to the decision — useful for you to point to in interviews.
+Preliminary result (Phase 1 sanity check, Kaggle notebook): logistic
+regression and Random Forest on structured fields alone both plateau at
+ROC AUC ≈ 0.5 — confirms structured-only features are insufficient and
+motivates Phases 3–4.
+
+## Evaluation & rigor
+
+AUROC/F1 alone reads as a class exercise. To show industrial thinking
+without building infra we don't need yet, every phase reports:
+
+- **Cost-sensitive metrics** — a false negative (missed denial, no appeal
+  filed) and a false positive (wasted appeal effort) aren't symmetric costs.
+  Each phase reports a precision/recall operating point chosen against an
+  assumed $-per-claim cost, not just AUROC.
+- **Calibration** — a calibration curve (or Brier score) alongside
+  discrimination metrics, since a threshold-based appeal workflow needs
+  trustworthy probabilities, not just correct ranking.
+- **Error analysis** — for phases 2–4, a short writeup of *which* claims
+  the new phase fixes that the previous phase missed. This is the actual
+  payoff of the progressive design and feeds the final ablation study.
+- **Label risk, stated explicitly** — Phase 3's MIMIC labels are proxy
+  labels (no ground-truth denial field); Phase 4's Synthea labels are
+  fault-injected. Both are flagged in the phase's report, not discovered
+  by a reader.
 
 ## Repo layout
 
 ```
 .
-├── phase1_baseline/       # Teammate B — LR + DT, SMOTE, stratified k-fold
-├── phase2_gbm_shap/       # Teammate B — XGBoost/LightGBM + SHAP
-├── phase3_clinicalbert/   # Teammate C — ClinicalBERT + MIMIC-IV-Note
-├── phase4_rag_agentic/    # You — FAISS retrieval + LLM-assisted inference
-├── mlops_platform/        # You — Docker, CI, MLflow, FastAPI serving, GCP IaC
-├── shared/                # Everyone — schemas, config, eval harness
-├── data/                  # raw/ processed/ external — gitignored, DVC-tracked
-├── docs/                  # architecture diagrams + ADRs
+├── phase1_baseline/       # Het — LR + DT, SMOTE, stratified k-fold
+├── phase2_gbm_shap/       # Nainica — XGBoost/LightGBM + SHAP
+├── phase3_clinicalbert/   # Het — ClinicalBERT + MIMIC-IV-Note
+├── phase4_rag_agentic/    # Sruthilaya — FAISS retrieval + LLM-assisted inference
+├── shared/                # Everyone — claim schema, eval harness (AUROC/F1, cost-sensitive metrics, calibration)
+├── mlops_platform/        # Sruthilaya, built last — demo/presentation site over finished phase results
+├── data/                  # raw/ processed/ external — gitignored
+├── docs/adr/              # architecture decisions, kept with their reasoning
 └── scripts/               # one-off setup / data-download scripts
 ```
+
+Every phase reads from `shared/schemas` and writes metrics through
+`shared/utils/eval.py` so results stay comparable across phases.
+
+## Quickstart
+
+```bash
+pip install -e .
+pytest
+```
+
+The demo site quickstart will be documented once `mlops_platform/` has
+results to show — see [TRACKER.md](TRACKER.md).
+
+## Tracking
+
+Deliverables, owners, and status live in [TRACKER.md](TRACKER.md), not here —
+keep this README as the stable project description and let the tracker
+change week to week.
