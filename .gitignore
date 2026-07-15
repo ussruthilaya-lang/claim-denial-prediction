@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Env / secrets
+.env
+*.pem
+gcp-service-account*.json
+
+# Data — never commit raw PHI-adjacent or large data. Use DVC pointers instead.
+data/raw/*
+data/processed/*
+data/external/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/external/.gitkeep
+*.csv
+*.parquet
+!**/samples/*.csv
+
+# MIMIC-IV-Note requires CITI training + PhysioNet credentialing.
+# Never commit discharge summaries or any derived text under this path.
+phase3_clinicalbert/data/*
+!phase3_clinicalbert/data/.gitkeep
+
+# FAISS indexes are large binary artifacts — store via DVC/GCS, not git
+phase4_rag_agentic/index/*.faiss
+phase4_rag_agentic/index/*.pkl
+
+# MLflow local store
+platform/mlflow/mlruns/
+mlruns/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# Terraform
+platform/terraform_gcp/.terraform/
+platform/terraform_gcp/*.tfstate*

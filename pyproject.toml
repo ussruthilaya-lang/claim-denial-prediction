@@ -1,0 +1,18 @@
+[project]
+name = "claim-denial-prediction"
+version = "0.1.0"
+description = "Root dev install for the monorepo (shared/, platform/, phase*_*/)"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "scikit-learn>=1.5",
+    "numpy>=1.26",
+]
+
+[tool.setuptools.packages.find]
+include = ["shared*", "mlops_platform*", "phase1_baseline*", "phase2_gbm_shap*", "phase3_clinicalbert*", "phase4_rag_agentic*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

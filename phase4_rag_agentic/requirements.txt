@@ -1,0 +1,6 @@
+faiss-cpu==1.8.0
+sentence-transformers==3.0.1
+anthropic==0.28.0
+openai==1.35.3
+numpy==1.26.4
+pydantic==2.7.4
