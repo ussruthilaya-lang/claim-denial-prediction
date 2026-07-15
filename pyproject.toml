@@ -1,7 +1,7 @@
 [project]
 name = "claim-denial-prediction"
 version = "0.1.0"
-description = "Root dev install for the monorepo (shared/, platform/, phase*_*/)"
+description = "Root dev install for the monorepo (shared/, mlops_platform/, phase*_*/)"
 requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.7",

@@ -34,16 +34,8 @@ phase3_clinicalbert/data/*
 phase4_rag_agentic/index/*.faiss
 phase4_rag_agentic/index/*.pkl
 
-# MLflow local store
-platform/mlflow/mlruns/
-mlruns/
-
 # Jupyter
 .ipynb_checkpoints/
 
 # OS
 .DS_Store
-
-# Terraform
-platform/terraform_gcp/.terraform/
-platform/terraform_gcp/*.tfstate*

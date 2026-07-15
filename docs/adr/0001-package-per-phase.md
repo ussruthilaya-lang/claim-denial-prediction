@@ -15,19 +15,24 @@ the end.
 Each phase is an independent installable package with its own `src/`,
 `tests/`, `requirements.txt`. A `shared/` package holds the one thing every
 phase must agree on (the `ClaimRecord` schema, the eval harness). A
-`mlops_platform/` package owns everything that turns four models into one system:
-Docker Compose for local dev, MLflow for tracking, a FastAPI serving layer,
-CI.
+`mlops_platform/` package owns turning four models' finished results into
+one thing to look at: a Streamlit demo app built last, over saved
+predictions/SHAP output/retrieval examples from each phase.
+
+**2026-07-15 update:** the original version of this decision also scoped
+Docker Compose, MLflow, a FastAPI serving layer, and CI into
+`mlops_platform/` from day one. That's cut — see the (removed) GCP ADR.
+Building serving infra before a single model exists was solving a problem
+we didn't have yet. The platform layer's job in this project is narrower:
+present finished results, not serve them.
 
 ## Consequences
 
 - Positive: teammates can work in parallel without stepping on each other's
-  code; the final demo is "hit an API endpoint," not "run four notebooks in
-  sequence and hope."
-- Positive: `mlops_platform/` becomes the reusable artifact — the same MLOps
-  pattern applies to the next project, which is the actual point of owning
-  this layer for your career track (this pattern generalizes to any
-  multi-model production system, not just claim denial).
+  code.
+- Positive: the demo app is still a real payoff for the platform-facing
+  teammate — a working comparison view across all four phases is more
+  convincing at presentation time than four separate notebooks.
 - Negative: more upfront structure than a notebook-first approach; teammates
   need to `pip install -e` their package rather than just running cells.
   Mitigated by keeping `notebooks/` available in each phase for exploration

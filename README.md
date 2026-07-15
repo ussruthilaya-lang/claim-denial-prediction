@@ -84,7 +84,7 @@ without building infra we don't need yet, every phase reports:
 ├── phase3_clinicalbert/   # Het — ClinicalBERT + MIMIC-IV-Note
 ├── phase4_rag_agentic/    # Sruthilaya — FAISS retrieval + LLM-assisted inference
 ├── shared/                # Everyone — claim schema, eval harness (AUROC/F1, cost-sensitive metrics, calibration)
-├── mlops_platform/        # Sruthilaya, built last — demo/presentation site over finished phase results
+├── mlops_platform/demo/   # Sruthilaya, built last — Streamlit app over finished phase results (`make demo`)
 ├── data/                  # raw/ processed/ external — gitignored
 ├── docs/adr/              # architecture decisions, kept with their reasoning
 └── scripts/               # one-off setup / data-download scripts

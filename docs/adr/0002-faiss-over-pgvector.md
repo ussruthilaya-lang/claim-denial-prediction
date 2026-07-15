@@ -18,10 +18,10 @@ FAISS (`IndexFlatIP`, upgradeable to `IndexIVFFlat` if the corpus grows past
 
 ## Reasoning
 
-- **Cost:** we're on a 90-day $300 GCP trial credit. A managed vector DB adds
-  a billable, always-on service before we've validated the retrieval
-  approach even works. FAISS costs nothing and runs in the same container as
-  the serving API.
+- **Cost:** a managed vector DB adds a billable, always-on service before
+  we've validated the retrieval approach even works, and there's no cloud
+  deployment in scope for this project. FAISS costs nothing and runs
+  in-process.
 - **Scale fit:** Synthea-scale synthetic data at ~19% denial prevalence puts
   us in the thousands-to-low-millions of vectors — well within FAISS's
   comfortable range without needing IVF/PQ compression tricks yet.
@@ -37,6 +37,5 @@ FAISS (`IndexFlatIP`, upgradeable to `IndexIVFFlat` if the corpus grows past
 - Positive: zero marginal infra cost during development; index rebuilds are
   a local, fast operation (`ClaimRetriever.save/load`).
 - Negative: FAISS doesn't handle horizontal scaling or high-availability
-  serving out of the box — if this ever needed to serve production traffic
-  at real hospital scale, this ADR would need revisiting (likely toward GCP
-  Vertex AI Matching Engine, given the GCP commitment in ADR 0003).
+  serving out of the box — out of scope here, but would need revisiting if
+  this ever served production traffic at real hospital scale.
