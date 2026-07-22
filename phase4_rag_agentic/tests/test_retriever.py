@@ -9,10 +9,10 @@ run, catches index/metadata drift immediately if someone changes `add()` or
 from datetime import date
 
 import numpy as np
-import pytest
 
-faiss = pytest.importorskip("faiss")
-
+# No faiss import-skip: the retriever falls back to an exact-cosine NumPy
+# backend with identical query semantics, so this contract must hold on any
+# machine, faiss installed or not.
 from phase4_rag_agentic.src.retriever import ClaimRetriever
 from shared.schemas.claim import ClaimRecord
 
@@ -48,3 +48,18 @@ def test_retriever_returns_nearest_neighbor_first():
 
     assert results[0].claim.claim_id == "near"
     assert results[0].similarity >= results[1].similarity
+
+
+def test_query_excludes_self_to_prevent_leakage():
+    """The self-exclusion guard is the core leakage protection: a claim must
+    never retrieve itself, or its own outcome leaks into its own features."""
+    retriever = ClaimRetriever(embedding_dim=4)
+    embeddings = np.array([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]])
+    claims = [_claim("self", denied=True), _claim("other", denied=False)]
+    retriever.add(embeddings, claims)
+
+    # Query is identical to "self" — without the guard it would rank first.
+    results = retriever.query(embeddings[0], k=1, exclude_ids={"self"})
+
+    assert len(results) == 1
+    assert results[0].claim.claim_id == "other"

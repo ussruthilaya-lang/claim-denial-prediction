@@ -1,0 +1,188 @@
+{
+  "B_structured_xgb": {
+    "phase": "phase4",
+    "model_name": "structured-xgb",
+    "auroc": 0.7422970582610913,
+    "f1": 0.41729851165402976,
+    "precision": 0.622799664710813,
+    "recall": 0.3137668918918919,
+    "n_samples": 10000
+  },
+  "B_retrieval_augmented": {
+    "phase": "phase4",
+    "model_name": "retrieval-augmented",
+    "auroc": 0.7655529294772367,
+    "f1": 0.44797843665768194,
+    "precision": 0.6192250372578242,
+    "recall": 0.35092905405405406,
+    "n_samples": 10000
+  },
+  "B_leaky_index_has_test": {
+    "phase": "phase4",
+    "model_name": "leaky-index",
+    "auroc": 0.9729717556589609,
+    "f1": 0.8285592133390338,
+    "precision": 0.8389610389610389,
+    "recall": 0.8184121621621622,
+    "n_samples": 10000
+  },
+  "oracle_ceiling_auroc": 0.8685926123647233,
+  "backend": "numpy",
+  "n_train": 30000,
+  "n_test": 10000,
+  "k": 10,
+  "label_noise": 0.0,
+  "test_prevalence": 0.2368,
+  "cost_operating_point": {
+    "threshold": 0.07,
+    "expected_cost": 288360.0,
+    "fn": 170,
+    "fp": 5509,
+    "tp": 2198,
+    "cost_per_claim": 28.836,
+    "do_nothing_cost": 947200.0,
+    "savings_vs_do_nothing": 658840.0
+  },
+  "recover_the_rule": {
+    "rank_agreement_spearman": 0.6674981511422502,
+    "driver_risk_lift": {
+      "untimely_filing": [
+        0.6145349740982056,
+        0.1714613139629364
+      ],
+      "missing_prior_auth": [
+        0.33251720666885376,
+        0.21962308883666992
+      ],
+      "medical_necessity": [
+        0.42192089557647705,
+        0.20094871520996094
+      ],
+      "out_of_network": [
+        0.23337261378765106,
+        0.22566351294517517
+      ]
+    }
+  },
+  "prevalence_check": [
+    {
+      "target_prevalence": 0.1,
+      "realized_prevalence": 0.1032,
+      "abs_error": 0.0031999999999999945
+    },
+    {
+      "target_prevalence": 0.15,
+      "realized_prevalence": 0.15216666666666667,
+      "abs_error": 0.002166666666666678
+    },
+    {
+      "target_prevalence": 0.19,
+      "realized_prevalence": 0.19116666666666668,
+      "abs_error": 0.001166666666666677
+    },
+    {
+      "target_prevalence": 0.25,
+      "realized_prevalence": 0.2498,
+      "abs_error": 0.00020000000000000573
+    },
+    {
+      "target_prevalence": 0.3,
+      "realized_prevalence": 0.2987666666666667,
+      "abs_error": 0.0012333333333333085
+    }
+  ],
+  "harmonization": [
+    {
+      "feature": "billed_amount",
+      "type": "numeric",
+      "psi": 0.0012859548454047483,
+      "ks_stat": 0.008633333333333382,
+      "ks_pvalue": 0.6278684819436138,
+      "drift": "negligible"
+    },
+    {
+      "feature": "filing_days",
+      "type": "numeric",
+      "psi": 0.19457076895254954,
+      "ks_stat": 0.16246666666666665,
+      "ks_pvalue": 1.9272501870654937e-173,
+      "drift": "moderate"
+    },
+    {
+      "feature": "insurance_type",
+      "type": "categorical",
+      "psi": 0.004384889882592112,
+      "ks_stat": NaN,
+      "ks_pvalue": NaN,
+      "drift": "negligible"
+    },
+    {
+      "feature": "cpt_code",
+      "type": "categorical",
+      "psi": 0.0009601465812078966,
+      "ks_stat": NaN,
+      "ks_pvalue": NaN,
+      "drift": "negligible"
+    },
+    {
+      "feature": "dx_category",
+      "type": "categorical",
+      "psi": 0.00044337811185542864,
+      "ks_stat": NaN,
+      "ks_pvalue": NaN,
+      "drift": "negligible"
+    },
+    {
+      "feature": "denial_prevalence",
+      "type": "label",
+      "psi": NaN,
+      "ks_stat": NaN,
+      "ks_pvalue": NaN,
+      "drift": "0.175 -> 0.237"
+    }
+  ],
+  "noise_sweep": [
+    {
+      "label_noise": 0.0,
+      "auroc_structured": 0.761518559532202,
+      "auroc_augmented": 0.7754429657338732,
+      "f1_augmented": 0.47619047619047616,
+      "oracle_ceiling": 0.8704441641514736
+    },
+    {
+      "label_noise": 0.05,
+      "auroc_structured": 0.7134159482758621,
+      "auroc_augmented": 0.7271749839366031,
+      "f1_augmented": 0.4174273858921162,
+      "oracle_ceiling": 0.8143608775969158
+    },
+    {
+      "label_noise": 0.1,
+      "auroc_structured": 0.6641274683257055,
+      "auroc_augmented": 0.6755925186611749,
+      "f1_augmented": 0.3695060287825749,
+      "oracle_ceiling": 0.7667813765791964
+    },
+    {
+      "label_noise": 0.2,
+      "auroc_structured": 0.6013842514703381,
+      "auroc_augmented": 0.607068397530078,
+      "f1_augmented": 0.31798319327731095,
+      "oracle_ceiling": 0.6837491745212914
+    },
+    {
+      "label_noise": 0.3,
+      "auroc_structured": 0.5493905877655321,
+      "auroc_augmented": 0.5568753786374026,
+      "f1_augmented": 0.2867112532712998,
+      "oracle_ceiling": 0.6143544829003832
+    },
+    {
+      "label_noise": 0.4,
+      "auroc_structured": 0.5185185988500021,
+      "auroc_augmented": 0.5232701487197411,
+      "f1_augmented": 0.36420302760463047,
+      "oracle_ceiling": 0.5609044273847915
+    }
+  ]
+}

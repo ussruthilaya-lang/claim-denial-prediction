@@ -34,6 +34,13 @@ phase3_clinicalbert/data/*
 phase4_rag_agentic/index/*.faiss
 phase4_rag_agentic/index/*.pkl
 
+# Phase 4 generated artifacts — regenerable via `python scripts/run_phase4.py`.
+# Keep figures/ and metrics.json (small, needed for the report); ignore the
+# large binaries (index vectors, model bundle, prediction dumps).
+phase4_rag_agentic/artifacts/*.pkl
+phase4_rag_agentic/artifacts/*.npy
+phase4_rag_agentic/artifacts/*.parquet
+
 # Jupyter
 .ipynb_checkpoints/
 

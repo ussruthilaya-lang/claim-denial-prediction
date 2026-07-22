@@ -1,6 +1,20 @@
-faiss-cpu==1.8.0
-sentence-transformers==3.0.1
-anthropic==0.28.0
-openai==1.35.3
-numpy==1.26.4
-pydantic==2.7.4
+# Phase 4 — retrieval-augmented denial prediction.
+# The pipeline, tests, figures, and demo run on the core stack alone; faiss and
+# the LLM SDKs are OPTIONAL upgrades (numpy-backend retrieval and a deterministic
+# mock rationale cover their absence — see retriever.py / llm_demo.py).
+numpy
+pandas
+scikit-learn
+scipy
+xgboost
+shap
+matplotlib
+pyarrow
+pydantic>=2
+
+# Optional: production ANN backend (numpy exact-cosine fallback if absent).
+# faiss-cpu
+
+# Optional: real LLM rationale in the demo (mock fallback if absent / no key).
+# anthropic
+# openai
