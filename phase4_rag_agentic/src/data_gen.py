@@ -105,6 +105,72 @@ FILING_WINDOW_DAYS = {
 
 N_PROVIDERS = 60
 
+# --------------------------------------------------------------------------- #
+# Clinical-note synthesis (Phase 3). The note is generated from the LATENT
+# `_necessity_documented` flag and NEVER from the denial label. Its only
+# label-relevant content is whether medical-necessity justification is
+# documented — a signal that lives in the narrative and is deliberately kept out
+# of the structured billing fields, so a text model (Phase 3) can recover
+# something the flat structured model cannot see. This is the text-side
+# counterpart to the latent per-provider propensity that only retrieval
+# (Phase 4) can reach. Wording is varied and lossy (templates + synonyms) so the
+# signal is *expressed*, not stamped as a single give-away token — which is what
+# keeps the recoverable AUROC realistic rather than extreme.
+# --------------------------------------------------------------------------- #
+_DX_PHRASES = {
+    "chronic": ["type 2 diabetes mellitus", "essential hypertension",
+                "hyperlipidemia", "stage 3 chronic kidney disease"],
+    "respiratory": ["an asthma exacerbation", "chronic obstructive pulmonary disease",
+                    "acute bronchitis"],
+    "musculoskeletal": ["chronic low back pain", "knee osteoarthritis",
+                        "persistent joint pain"],
+    "mental_health": ["generalized anxiety disorder", "major depressive disorder",
+                      "an adjustment disorder"],
+    "gastro": ["gastroesophageal reflux disease", "diverticulosis", "cholelithiasis"],
+}
+_SEX = ["male", "female"]
+_FILLER = [
+    "Vital signs were stable and the examination was unremarkable aside from the presenting complaint.",
+    "Past medical history was reviewed and home medications were reconciled.",
+    "The patient tolerated the encounter well and appropriate follow-up was arranged.",
+    "Relevant laboratory studies were reviewed and were within expected limits.",
+]
+# Documented-necessity language (present only when _necessity_documented True).
+_JUSTIFICATION = [
+    "Conservative management including NSAIDs and physical therapy was trialed for six weeks without adequate relief.",
+    "Symptoms have progressed despite first-line therapy, and prior imaging supports the need for this intervention.",
+    "The patient meets published guideline criteria; earlier conservative measures failed to control symptoms.",
+    "Documentation establishes medical necessity: prior treatments were exhausted and the condition continues to worsen.",
+]
+# Text used when necessity is NOT documented — a neutral procedure line or an
+# explicit documentation gap. Never mentions coverage, payer, or the outcome.
+_NO_JUSTIFICATION = [
+    "The procedure was performed during today's encounter.",
+    "The service was carried out as scheduled.",
+    "No prior conservative therapy is documented in the available record.",
+    "Indication was noted per the ordering provider; further justification was not recorded.",
+]
+
+
+def _compose_note(aux, icd_cat: str, proc_label: str, documented: bool) -> str:
+    """Build one synthetic clinical note. `aux` is a dedicated RNG stream so note
+    text does not perturb the structured-claim random draws (keeps the structured
+    fields identical to the note-free baseline for clean regression checks)."""
+    age = int(aux.integers(19, 89))
+    sex = _SEX[aux.integers(2)]
+    dx_list = _DX_PHRASES[icd_cat]
+    dx = dx_list[aux.integers(len(dx_list))]
+    verb = ["performed", "ordered", "completed"][aux.integers(3)]
+    opening = f"{age}-year-old {sex} evaluated for {dx}."
+    proc_line = f"{proc_label} was {verb}."
+    if documented:
+        necessity = _JUSTIFICATION[aux.integers(len(_JUSTIFICATION))]
+    else:
+        necessity = _NO_JUSTIFICATION[aux.integers(len(_NO_JUSTIFICATION))]
+    fi = aux.choice(len(_FILLER), size=2, replace=False)
+    parts = [opening, _FILLER[fi[0]], proc_line, necessity, _FILLER[fi[1]]]
+    return " ".join(parts)
+
 
 @dataclass
 class GeneratedClaims:
@@ -144,6 +210,9 @@ def generate_claims(n: int = 40_000, seed: int = 42,
 
     span_days = (end - start).days
     rows = []
+    # Dedicated RNG for note text + documentation flag, so the structured claim
+    # draws below stay byte-identical to the note-free baseline.
+    aux = np.random.default_rng(seed + 7)
     for i in range(n):
         payer = rng.choice(INSURANCE_TYPES, p=INSURANCE_WEIGHTS)
         icd_cat = rng.choice(ICD_CATEGORIES)
@@ -191,6 +260,14 @@ def generate_claims(n: int = 40_000, seed: int = 42,
         # is covered for?
         necessity_ok = icd_cat in proc.covered_for
 
+        # Documentation-of-necessity: latent, orthogonal to the observable
+        # billing fields, expressed only in the clinical note. ~60% of encounters
+        # document justification; when they don't, denial risk rises (see
+        # `undocumented_necessity` in labeling.py). This is the note-only signal
+        # Phase 3 exists to recover.
+        necessity_documented = bool(aux.random() < 0.60)
+        clinical_note = _compose_note(aux, icd_cat, proc.label, necessity_documented)
+
         rows.append({
             "claim_id": f"CLM-{i:07d}",
             "provider_id": provider,
@@ -201,6 +278,7 @@ def generate_claims(n: int = 40_000, seed: int = 42,
             "billed_amount": billed,
             "service_date": service,
             "submission_date": submission,
+            "clinical_note": clinical_note,
             # ---- latent denial drivers (consumed by labeling.py only) ----
             "_icd_category": icd_cat,
             "_procedure_base_cost": proc.base_cost,
@@ -211,6 +289,7 @@ def generate_claims(n: int = 40_000, seed: int = 42,
             "_prior_auth_obtained": pa_obtained,
             "_in_network": in_network,
             "_necessity_ok": necessity_ok,
+            "_necessity_documented": necessity_documented,
             "_provider_quality": provider_quality[provider],
             "_provider_propensity": provider_propensity[provider],
         })
@@ -241,8 +320,30 @@ def row_to_claim(row: pd.Series) -> ClaimRecord:
     )
 
 
+def generate_dataset(n: int = 40_000, seed: int = 42,
+                     target_prevalence: float = 0.19,
+                     label_noise: float = 0.0) -> pd.DataFrame:
+    """Unified entry point for ALL phases: generate correlated claims (with a
+    synthetic `clinical_note` per claim) AND inject denial labels in one call, so
+    every phase consumes the exact same rows and the cross-phase ablation is
+    apples-to-apples by construction.
+
+    Returns the labeled frame with observable columns (incl. `clinical_note`),
+    the `denied` / `true_denial_prob` / `reason_code` labels, and the latent
+    `_`-prefixed driver columns (consumed only by labeling / auditing, never fed
+    to a model). Import is function-local to avoid a data_gen<->labeling cycle.
+    """
+    from phase4_rag_agentic.src.labeling import label_claims
+    gen = generate_claims(n=n, seed=seed)
+    return label_claims(gen.frame, target_prevalence=target_prevalence,
+                        label_noise=label_noise, seed=seed).frame
+
+
 if __name__ == "__main__":
     gen = generate_claims(n=2000, seed=0)
     print(gen.frame[gen.observable_columns].head())
     print("\nlatent drivers:", gen.latent_columns)
     print("n claims:", len(gen.frame))
+    doc_rate = (~gen.frame["_necessity_documented"]).mean()
+    print(f"\nundocumented-necessity rate: {doc_rate:.3f}")
+    print("\nsample clinical_note:\n", gen.frame["clinical_note"].iloc[0])

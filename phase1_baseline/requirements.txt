@@ -1,0 +1,8 @@
+# Phase 1 — structured baseline (logistic regression + decision tree).
+# Reproduces Hiremath et al.: SMOTE + RFE + stratified k-fold on the unified
+# generated dataset, reported through shared/utils/eval.py.
+numpy
+pandas
+scikit-learn
+imbalanced-learn
+pydantic>=2
