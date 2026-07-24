@@ -176,7 +176,7 @@ def results_tab(art):
     for i, (fname, caption) in enumerate(figs):
         p = FIG / fname
         if p.exists():
-            cols[i % 2].image(str(p), caption=caption, use_container_width=True)
+            cols[i % 2].image(str(p), caption=caption, use_column_width=True)
 
 
 @st.cache_resource
@@ -286,7 +286,7 @@ def evidence_tab():
         ("evidence_score_distribution.png", "Score separation (semantic)")]):
         p = FIG / fname
         if p.exists():
-            fig_cols[i].image(str(p), caption=caption, use_container_width=True)
+            fig_cols[i].image(str(p), caption=caption, use_column_width=True)
 
 
 def main():
