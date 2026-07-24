@@ -129,8 +129,9 @@ def _claim_card(claim):
 
 # ───────────────────────────── Tab 1: Check a claim ─────────────────────────
 def score_tab(art, test):
-    st.caption("Estimate how likely a claim is to be **denied** before you submit it — "
-               "with the reason and a suggested fix.")
+    st.caption("Estimate a claim's **denial risk** before you submit it — with the reason and a "
+               "fix. Uses the structured billing fields + similar past claims; the clinical note "
+               "is analyzed separately in **Check the documentation**.")
     left, right = st.columns([1, 1.4], gap="large")
 
     with left:
@@ -369,14 +370,14 @@ def main():
         return
     art, test = load_artifacts()
 
-    t1, t2, t3 = st.tabs(["🔎 Check a claim", "📊 How well it works",
-                          "📄 Check the documentation"])
+    t1, t2, t3 = st.tabs(["🔎 Check a claim", "📄 Check the documentation",
+                          "📊 How well it works"])
     with t1:
         score_tab(art, test)
     with t2:
-        results_tab(art)
-    with t3:
         evidence_tab()
+    with t3:
+        results_tab(art)
 
     st.divider()
     st.caption(f"CS6140 · Phase 4 (retrieval-augmented denial prediction) · "
