@@ -159,6 +159,53 @@ def plot_noise_sweep(df) -> Path:
     return _save(fig, "noise_sweep.png")
 
 
+_EVIDENCE_CLASSES = ["complete", "omitted", "unsupported"]
+
+
+def plot_evidence_confusion(results: list[dict], method_name: str, filename: str) -> Path:
+    """Confusion matrix (gold_variant vs predicted_status) for an evidence
+    retriever's classify_case() output, same visual system as the rest of Phase 4."""
+    from sklearn.metrics import confusion_matrix
+
+    gold = [r["gold_variant"] for r in results]
+    pred = [r["predicted_status"] for r in results]
+    cm = confusion_matrix(gold, pred, labels=_EVIDENCE_CLASSES)
+    fig, ax = plt.subplots(figsize=(4.6, 4.2))
+    im = ax.imshow(cm, cmap="Blues", vmin=0)
+    ax.set_xticks(range(3), _EVIDENCE_CLASSES, rotation=20, ha="right")
+    ax.set_yticks(range(3), _EVIDENCE_CLASSES)
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Gold")
+    ax.set_title(f"{method_name}: evidence-status confusion matrix", pad=12)
+    for i in range(3):
+        for j in range(3):
+            frac = cm[i, j] / max(cm[i].sum(), 1)
+            color = "white" if frac > 0.5 else INK
+            ax.text(j, i, str(cm[i, j]), ha="center", va="center",
+                    color=color, fontweight="bold")
+    ax.grid(False)
+    fig.colorbar(im, ax=ax, shrink=0.8, label="count")
+    return _save(fig, filename)
+
+
+def plot_evidence_score_distribution(results: list[dict]) -> Path:
+    """Score separation for the semantic retriever: rec_score for
+    complete/omitted (evidence genuinely present) vs unsupported (absent)."""
+    present = [r["rec_score"] for r in results if r["gold_variant"] in ("complete", "omitted")]
+    absent = [r["rec_score"] for r in results if r["gold_variant"] == "unsupported"]
+    fig, ax = plt.subplots(figsize=(6.4, 3.6))
+    bins = np.linspace(0, 1, 26)
+    ax.hist(present, bins=bins, color=GREEN, alpha=0.75, label="complete / omitted (evidence present)")
+    ax.hist(absent, bins=bins, color=CRITICAL, alpha=0.75, label="unsupported (evidence absent)")
+    ax.axvline(np.mean(present), color=GREEN, ls="--", lw=1.5)
+    ax.axvline(np.mean(absent), color=CRITICAL, ls="--", lw=1.5)
+    ax.set_xlabel("Semantic retriever rec_score (best match to full record)")
+    ax.set_ylabel("Case count")
+    ax.set_title("Score separation: evidence-present vs evidence-absent")
+    ax.legend(frameon=False, fontsize=9)
+    return _save(fig, "evidence_score_distribution.png")
+
+
 def plot_harmonization(report_df) -> Path:
     d = report_df[report_df["type"].isin(["numeric", "categorical"])].copy()
     fig, ax = plt.subplots(figsize=(6.6, 3.4))

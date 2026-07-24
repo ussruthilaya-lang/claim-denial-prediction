@@ -12,6 +12,10 @@ matplotlib
 pyarrow
 pydantic>=2
 
+# Required by the evidence-completeness extension's semantic retriever
+# (evidence_retriever_semantic.py) — no fallback, unlike faiss/LLM SDKs below.
+sentence-transformers
+
 # Optional: production ANN backend (numpy exact-cosine fallback if absent).
 # faiss-cpu
 

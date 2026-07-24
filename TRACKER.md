@@ -83,7 +83,7 @@ SHAP (top feature is a retrieval feature); **label-noise sweep + recover-the-rul
 explicitly. faiss and LLM SDKs are optional (numpy retrieval backend + mock
 rationale), so it runs on any machine with no external services.
 
-## Phase 4 extension — requirement-level evidence RAG (2026-07-24, in-progress)
+## Phase 4 extension — requirement-level evidence RAG (2026-07-24, done — Sruthilaya's part; pending team merge into shared report)
 
 Sruthilaya is extending Phase 4 with a second, deeper RAG: instead of
 retrieving similar *claims*, this retrieves whether a specific LCD
@@ -111,14 +111,100 @@ Done: `evidence_policies.py` (10 real CMS LCD-derived requirements, 2
 families), `evidence_data_gen.py` (150 fault-injected cases, 50/50/50 split),
 both retrievers above, `artifacts/ablation_summary.json`.
 
-Not yet done, in priority order:
-1. Gold-check subset — hand-verify ~15-20 of 150 auto-generated labels, report agreement % (feedback #1 framing)
-2. Point existing `harmonization.py` PSI/KS report at this new patient population vs. Phase 1-2's (feedback #2)
-3. Confusion matrix + score-distribution + PSI figures, same palette as `plots.py`
-4. Cited deficiency report function (status + cited chunk + requirement text), mirroring `llm_demo.py`'s pattern
-5. Demo app integration — new tab in `mlops_platform/demo/app.py` alongside the existing claim-denial demo
-6. Data provenance paragraph — CMS LCD text is real/sourced; patient records are Synthea-schema-realistic but not literally downloaded (no internet access in build environment) — disclosed as a scope decision, not hidden
-7. Report writeup — non-deviation framing, scope cuts (3-class not 5, 2 families not 4, ~150 not 1,200 cases, manual requirement extraction not auto-decomposition), IMG-4/5-fixed vs. IMG-2/3-still-fail as the headline finding
+Gold-check subset (2026-07-24, done): hand-verified 18 of 150 cases (12%
+sample, `random.Random(7)`) against the injected evidence templates and
+`full_record_chunks`/`submitted_chunks` split. **18/18 (100%) agreement** —
+`complete` cases have the evidence chunk in both submitted and full record,
+`omitted` cases have it in the full record only, `unsupported` cases have no
+evidence chunk anywhere and `gold_evidence_text` is correctly `None`. This is
+the same "stress-test your proxy labels early" move the instructor asked for
+at the claim level, applied here at the requirement level — the injection
+logic does what it claims.
+
+Population harmonization (feedback #2) — **scoped out, not missing.** The
+evidence cases have no billing-style fields (`billed_amount`, `cpt_code`,
+etc.) to run `harmonization.py`'s PSI/KS check against; that check is a
+different unit of analysis (claim-level fields vs. requirement-level text
+evidence). Feedback #2 is already answered at the claim level by Phase 4's
+own PSI/KS report; the extension states this explicitly in the writeup
+rather than forcing an artificial structured-field comparison.
+
+Figures (2026-07-24, done) — `plots.py` extended with
+`plot_evidence_confusion()` and `plot_evidence_score_distribution()`, same
+palette/style as the rest of Phase 4:
+- `evidence_confusion_tfidf.png`, `evidence_confusion_semantic.png` — gold
+  vs. predicted evidence status. Semantic confusion matrix confirms the
+  known failure cluster precisely: 10/50 `complete` and 10/50 `omitted`
+  cases predicted as `unsupported` (the IMG-2/3 abstract-phrasing gap);
+  `unsupported` itself is the most reliable class (46/50 correct).
+- `evidence_score_distribution.png` — rec_score histogram, complete/omitted
+  vs. unsupported. Clean bimodal separation (means 0.525 vs 0.258) with a
+  visible overlap band ~0.2-0.3 — shown honestly, not smoothed over.
+
+Cited deficiency report (2026-07-24, done) — `evidence_report.py`, mirroring
+`llm_demo.py`'s exact pattern: status + cited chunk come from the
+deterministic semantic retriever (never the LLM), a `mock_llm` composes the
+reviewer-facing explanation with zero network dependency, and an optional
+real LLM (Anthropic/OpenAI key) only upgrades the prose. Verified against
+one case per gold variant — all three predicted correctly and produce a
+concrete, actionable explanation (e.g., omitted case: "the PT progress note
+... exists in the record but was not included in what was submitted ...
+adding this note to the packet should resolve the deficiency"). Also fixed
+a broken relative import in `evidence_data_gen.py` (`from src.evidence_policies`
+→ `from phase4_rag_agentic.src.evidence_policies`) that would have silently
+blocked this integration outside one specific working directory.
+
+Demo app integration (2026-07-24, done) — new third tab "Evidence
+completeness (extension)" in `mlops_platform/demo/app.py`, built for
+transparency: a scope banner states up front that this is a separate,
+narrower test from the Phase 1-4 denial model in the other two tabs (2
+procedure families, 10 requirements, 150 hand-checked synthetic cases).
+Every step is shown, not just the final answer — submitted vs. full-record
+chunks side by side, both TF-IDF and semantic retrieval scores in one table,
+the final status compared against the case's known injected ground truth
+(labeled as such, since this is a scoped eval case, not a real claim), and
+the accuracy/confusion-matrix/score-distribution results at the bottom.
+Verified end-to-end with Streamlit's `AppTest` headless harness (no browser
+tooling available in this environment) — no exceptions, and selecting the
+IMG-4 "omitted" case correctly shows TF-IDF missing it (predicts
+unsupported) while semantic catches it (predicts omitted), exactly matching
+the documented failure/fix pattern.
+
+Demo UX pass (2026-07-24, done) — reworked the extension tab from a
+markdown-scribble layout into an equal-width 3-stage pipeline (Input →
+Retrieve → Generate, fixed-height bordered cards), surfaced the actual
+retrieved chunk (not just similarity scores) so the RAG retrieve-then-generate
+flow is visible, and added a live cache-hit/computed indicator so the
+"why is this instant" question has an honest, visible answer rather than
+an unexplained fast demo. Also gave the claim-denial tab's claim record its
+own visible input card (previously the chosen claim's fields were never
+shown before scoring).
+
+Data provenance (2026-07-24, done, stated here for the report): CMS LCD
+requirement *text* is real, paraphrased from public CMS LCD L34220/L37281
+(lumbar MRI) and L33942 (PT/rehab) policy documentation — not synthetic.
+What's synthetic is the *evidence* side: the patient chart chunks (PT
+progress notes, exam findings) that satisfy or fail to satisfy those real
+requirements, and the case-assembly logic (which chunks go in the submitted
+packet vs. the full record). Real Synthea patient bundles were not
+downloadable in this build environment (no internet access to the Synthea
+data generator/repository at build time), so the patient side is
+schema-realistic-but-authored rather than literally downloaded — the same
+scope decision Phase 4's base claim generator already made and disclosed,
+applied one level deeper. This is stated directly, not left for a reader to
+discover.
+
+Both items originally on this list are done.
+
+Report section (2026-07-24, done — Sruthilaya's part) —
+`docs/report_phase4_section.md`: Methods/Dataset/Results/Discussion/Future
+Work for Phase 4 + the evidence extension, plus an AI-prompts log scoped to
+the intellectual decisions (why the extension was scoped this way, the
+templated-vs-LLM data-generation call, why harmonization was explicitly
+skipped rather than forced, the gold-check-before-building-on-top
+discipline, demo transparency choices) rather than routine build steps.
+Ready to merge into the shared 8-page report; Het/Nainica sections still
+pending.
 
 ## Week 1 (2026-07-15 → 2026-07-21) — real data, ported code, working models
 

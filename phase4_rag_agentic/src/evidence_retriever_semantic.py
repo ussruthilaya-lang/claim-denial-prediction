@@ -20,6 +20,11 @@ def _embed(text):
         _CACHE[text] = load_model().encode(text, normalize_embeddings=True)
     return _CACHE[text]
 
+def cache_size():
+    """Number of unique texts embedded so far this process. Exposed so a caller
+    can report cache-hit vs. freshly-computed counts honestly (e.g. in a demo)."""
+    return len(_CACHE)
+
 def best_match(query_text, candidate_chunks):
     if not candidate_chunks:
         return None, 0.0

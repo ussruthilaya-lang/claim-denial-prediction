@@ -5,7 +5,7 @@ truth. Structurally mirrors Synthea's encounter/observation model; real Synthea
 bundles were not downloadable in this environment (see data provenance note).
 """
 import random
-from src.evidence_policies import ALL_POLICIES
+from phase4_rag_agentic.src.evidence_policies import ALL_POLICIES
 
 # positive evidence + distractor chunk templates per requirement id
 EVIDENCE_TEMPLATES = {
