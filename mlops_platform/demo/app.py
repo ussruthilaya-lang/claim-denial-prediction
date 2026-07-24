@@ -65,12 +65,11 @@ st.set_page_config(page_title="DenialGuard", page_icon="🛡️", layout="wide")
 
 
 def _inject_css():
-    # Minimal declutter: hide Streamlit's Deploy button / toolbar / footer chrome.
+    # Minimal declutter: hide only the Deploy button + footer. Keep the top-right
+    # "⋮" menu so the built-in Light/Dark theme switcher (Settings → Theme) stays.
     st.markdown(
         "<style>"
-        "[data-testid='stToolbar']{visibility:hidden;height:0;}"
         "[data-testid='stDeployButton']{display:none;}"
-        "[data-testid='stHeader']{background:transparent;}"
         "footer{visibility:hidden;}"
         "</style>",
         unsafe_allow_html=True)
@@ -113,13 +112,13 @@ def _claim_card(claim):
     cells = "".join(
         "<div style='display:flex;justify-content:space-between;gap:12px;padding:5px 0;"
         "border-bottom:1px solid rgba(128,128,128,0.15)'>"
-        f"<span style='color:#8a8f98'>{k}</span>"
+        f"<span style='color:#6b7280'>{k}</span>"
         f"<span style='font-weight:600;text-align:right'>{v}</span></div>"
         for k, v in rows)
     st.markdown(
         "<div style='padding:14px 18px;border:1px solid rgba(128,128,128,0.3);"
         "border-radius:12px'>"
-        "<div style='font-size:0.8rem;color:#8a8f98;letter-spacing:.03em'>CLAIM RECORD</div>"
+        "<div style='font-size:0.8rem;color:#6b7280;letter-spacing:.03em'>CLAIM RECORD</div>"
         f"<div style='font-size:1.25rem;font-weight:700;margin-bottom:8px'>{claim.claim_id}</div>"
         f"{cells}</div>",
         unsafe_allow_html=True)

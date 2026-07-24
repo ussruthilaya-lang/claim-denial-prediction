@@ -1,0 +1,5 @@
+# Demo theme. Light by default; users can switch Light/Dark from the app's
+# top-right "⋮" menu → Settings → Theme.
+[theme]
+base = "light"
+primaryColor = "#2563EB"
