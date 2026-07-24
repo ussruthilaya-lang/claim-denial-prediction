@@ -210,6 +210,19 @@ def results_tab(art):
     c3.metric("Savings vs. no model", f"${cop['savings_vs_do_nothing']:,.0f}",
               help="Total saved across the test set vs. reviewing nothing.")
 
+    with st.expander("How is the cost calculated?"):
+        st.markdown(
+            "The review cutoff is set to **minimize real dollars**, not just error rate. "
+            "Two mistakes are priced:\n\n"
+            "- **Missed denial** — flagged as safe but actually denied: **\\$400**\n"
+            "- **Unnecessary review** — flagged but would've been paid: **\\$40**\n\n"
+            "Every cutoff is swept, and the one with the lowest "
+            "**\\$400 × missed denials + \\$40 × unnecessary reviews** (on the held-out test "
+            "set) is chosen. Because a missed denial costs 10× a wasted review, the best "
+            "cutoff is low — it pays to flag aggressively. **Savings vs. no model** compares "
+            "that cost against reviewing nothing, where every denial is missed.\n\n"
+            "_The \\$400 / \\$40 are illustrative cost assumptions, not billed amounts._")
+
     st.divider()
     st.markdown("**How each phase of the project adds up**")
     if UNIFIED_FIG.exists():
