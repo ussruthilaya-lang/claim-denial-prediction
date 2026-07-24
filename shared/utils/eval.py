@@ -78,3 +78,56 @@ def log_to_mlflow(result: EvalResult, params: dict[str, Any] | None = None) -> N
                 "n_samples": result.n_samples,
             }
         )
+
+
+def _percentiles(values: list[float], ci: float) -> list[float]:
+    lo, hi = (1 - ci) / 2 * 100, (1 + ci) / 2 * 100
+    return [float(np.percentile(values, lo)), float(np.percentile(values, hi))]
+
+
+def bootstrap_auroc_lift(
+    y_true: np.ndarray,
+    p_base: np.ndarray,
+    p_better: np.ndarray,
+    n_boot: int = 2000,
+    seed: int = 0,
+    ci: float = 0.95,
+) -> dict[str, Any]:
+    """PAIRED percentile bootstrap for an AUROC lift (better - base).
+
+    A phase-vs-phase lift of a few AUROC points invites the question "is that
+    real or noise?". This answers it: resample the test rows with replacement and
+    score BOTH models on the SAME resample each iteration (their errors are
+    correlated, so pairing gives the correct, tighter CI on the difference than
+    two independent CIs would). Returns each model's CI, the lift CI, and a
+    one-sided bootstrap p-value = fraction of resamples where the lift is <= 0.
+    Reusable for any phase pair (text lift, retrieval lift, ...).
+    """
+    y_true = np.asarray(y_true)
+    p_base = np.asarray(p_base)
+    p_better = np.asarray(p_better)
+    rng = np.random.default_rng(seed)
+    n = len(y_true)
+    base, better, lift = [], [], []
+    for _ in range(n_boot):
+        idx = rng.integers(0, n, n)
+        yt = y_true[idx]
+        if yt.min() == yt.max():  # need both classes to define AUROC
+            continue
+        a = roc_auc_score(yt, p_base[idx])
+        b = roc_auc_score(yt, p_better[idx])
+        base.append(a)
+        better.append(b)
+        lift.append(b - a)
+    lift_arr = np.asarray(lift)
+    return {
+        "auroc_base": float(roc_auc_score(y_true, p_base)),
+        "auroc_better": float(roc_auc_score(y_true, p_better)),
+        "auroc_base_ci": _percentiles(base, ci),
+        "auroc_better_ci": _percentiles(better, ci),
+        "lift_point": float(roc_auc_score(y_true, p_better) - roc_auc_score(y_true, p_base)),
+        "lift_mean": float(lift_arr.mean()),
+        "lift_ci": _percentiles(lift_arr, ci),
+        "p_value_one_sided": float((lift_arr <= 0).mean()),
+        "n_boot": int(len(lift_arr)),
+    }

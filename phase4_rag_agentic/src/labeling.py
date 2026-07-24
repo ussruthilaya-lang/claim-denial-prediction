@@ -38,7 +38,8 @@ import pandas as pd
 DRIVER_WEIGHTS = {
     "untimely_filing": 3.2,        # submitted after the payer's filing window
     "missing_prior_auth": 2.6,     # procedure required prior auth, none obtained
-    "medical_necessity": 2.0,      # diagnosis not covered for this procedure
+    "medical_necessity": 2.0,      # diagnosis not covered for this procedure (code-based)
+    "undocumented_necessity": 1.6, # necessity not JUSTIFIED in the note (text-only signal)
     "out_of_network": 1.4,         # provider out-of-network for the payer
     "billing_anomaly": 1.2,        # billed amount far above the procedure norm
 }
@@ -54,6 +55,7 @@ REASON_TEXT = {
     "untimely_filing": "CO-29 Untimely filing: submitted after payer window",
     "missing_prior_auth": "CO-197 Precertification/authorization absent",
     "medical_necessity": "CO-50 Non-covered: not deemed medically necessary",
+    "undocumented_necessity": "CO-50/N115 Medical necessity not established by documentation",
     "out_of_network": "CO-242 Services not provided by network provider",
     "billing_anomaly": "CO-45 Charge exceeds fee schedule / documentation",
     "baseline": "No dominant driver (baseline payer risk)",
@@ -77,6 +79,9 @@ def _driver_contributions(frame: pd.DataFrame) -> pd.DataFrame:
     late = (frame["_filing_days"] > frame["_filing_window"]).astype(float)
     no_pa = (frame["_prior_auth_required"] & ~frame["_prior_auth_obtained"]).astype(float)
     necessity = (~frame["_necessity_ok"]).astype(float)
+    # Necessity documented in the note? Undocumented raises denial risk and is
+    # visible ONLY in the clinical note, not in any structured billing field.
+    undocumented = (~frame["_necessity_documented"]).astype(float)
     oon = (~frame["_in_network"]).astype(float)
     # Billing anomaly ramps up only once the amount is well above the norm.
     anomaly = np.clip(frame["_amount_ratio"] - 1.6, 0, None)
@@ -85,6 +90,7 @@ def _driver_contributions(frame: pd.DataFrame) -> pd.DataFrame:
         "untimely_filing": DRIVER_WEIGHTS["untimely_filing"] * late,
         "missing_prior_auth": DRIVER_WEIGHTS["missing_prior_auth"] * no_pa,
         "medical_necessity": DRIVER_WEIGHTS["medical_necessity"] * necessity,
+        "undocumented_necessity": DRIVER_WEIGHTS["undocumented_necessity"] * undocumented,
         "out_of_network": DRIVER_WEIGHTS["out_of_network"] * oon,
         "billing_anomaly": DRIVER_WEIGHTS["billing_anomaly"] * anomaly,
     }, index=frame.index)

@@ -69,7 +69,13 @@ class _NumpyBackend:
     def search(self, q: np.ndarray, k: int):
         if self._mat.shape[0] == 0:
             return np.full((q.shape[0], k), -np.inf), np.full((q.shape[0], k), -1)
-        sims = q @ self._mat.T                       # (n_query, n_index)
+        # Inputs are unit-normalized (|sims| <= 1), so there is no real overflow or
+        # divide-by-zero here. NumPy still emits spurious "divide by zero / overflow
+        # / invalid value encountered in matmul" RuntimeWarnings on some float32
+        # BLAS/SIMD paths for perfectly finite inputs — silence those false
+        # positives; the computed values are unchanged.
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            sims = q @ self._mat.T                   # (n_query, n_index)
         k = min(k, sims.shape[1])
         # argpartition for top-k then sort those k descending — O(n) not O(n log n).
         idx = np.argpartition(-sims, k - 1, axis=1)[:, :k]

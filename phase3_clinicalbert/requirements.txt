@@ -1,0 +1,19 @@
+# Phase 3 — clinical-note feature extraction + fusion.
+# The pipeline runs on the core stack with the default TF-IDF encoder (no heavy
+# deps) so the ablation reproduces anywhere in seconds. Bio_ClinicalBERT (the
+# proposal's encoder) is an OPTIONAL upgrade behind `--encoder clinicalbert`.
+numpy
+pandas
+scikit-learn
+xgboost
+matplotlib
+pydantic>=2
+
+# Optional: Bio_ClinicalBERT CLS embeddings (--encoder clinicalbert).
+# CPU works; Apple-Silicon MPS / CUDA are auto-detected for a big speedup.
+# torch
+# transformers
+
+# Optional: Claude zero-shot LLM baseline (llm_baseline.py). Needs ANTHROPIC_API_KEY
+# in .env; no-ops without it. Uses the Batch API + prompt caching + structured output.
+# anthropic
