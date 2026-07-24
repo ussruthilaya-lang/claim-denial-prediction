@@ -1,0 +1,119 @@
+{
+  "encoder": "tfidf",
+  "text_dim": 400,
+  "n_train": 30000,
+  "n_test": 10000,
+  "k": 10,
+  "test_prevalence": 0.2289,
+  "models": {
+    "structured": {
+      "phase": "ablation",
+      "model_name": "structured",
+      "auroc": 0.7328484683050245,
+      "f1": 0.3978842198060535,
+      "precision": 0.6077199281867145,
+      "recall": 0.29576234163390125,
+      "n_samples": 10000
+    },
+    "structured+text": {
+      "phase": "ablation",
+      "model_name": "structured+text",
+      "auroc": 0.7686696774631442,
+      "f1": 0.4092526690391459,
+      "precision": 0.6371191135734072,
+      "recall": 0.30144167758846657,
+      "n_samples": 10000
+    },
+    "structured+retrieval": {
+      "phase": "ablation",
+      "model_name": "structured+retrieval",
+      "auroc": 0.7546409647012979,
+      "f1": 0.4074074074074074,
+      "precision": 0.5855855855855856,
+      "recall": 0.31236347750109217,
+      "n_samples": 10000
+    },
+    "structured+text+retrieval": {
+      "phase": "ablation",
+      "model_name": "structured+text+retrieval",
+      "auroc": 0.795428498002802,
+      "f1": 0.4745670995670996,
+      "precision": 0.6233120113717129,
+      "recall": 0.3831367409349061,
+      "n_samples": 10000
+    }
+  },
+  "oracle_ceiling_auroc": 0.8827210298372071,
+  "lifts": {
+    "structured+text": {
+      "auroc_base": 0.7328484683050245,
+      "auroc_better": 0.7686696774631442,
+      "auroc_base_ci": [
+        0.7198692331840878,
+        0.7450535823241459
+      ],
+      "auroc_better_ci": [
+        0.757638824002254,
+        0.7794917707901611
+      ],
+      "lift_point": 0.035821209158119705,
+      "lift_mean": 0.03573278063759247,
+      "lift_ci": [
+        0.026078144589962878,
+        0.04574431871422627
+      ],
+      "p_value_one_sided": 0.0,
+      "n_boot": 2000
+    },
+    "structured+retrieval": {
+      "auroc_base": 0.7328484683050245,
+      "auroc_better": 0.7546409647012979,
+      "auroc_base_ci": [
+        0.7198692331840878,
+        0.7450535823241459
+      ],
+      "auroc_better_ci": [
+        0.7427457663450532,
+        0.766315583162578
+      ],
+      "lift_point": 0.021792496396273453,
+      "lift_mean": 0.021761281135474778,
+      "lift_ci": [
+        0.013487691972122585,
+        0.029670540719482188
+      ],
+      "p_value_one_sided": 0.0,
+      "n_boot": 2000
+    },
+    "structured+text+retrieval": {
+      "auroc_base": 0.7328484683050245,
+      "auroc_better": 0.795428498002802,
+      "auroc_base_ci": [
+        0.7198692331840878,
+        0.7450535823241459
+      ],
+      "auroc_better_ci": [
+        0.7848720085928087,
+        0.8053398709870735
+      ],
+      "lift_point": 0.06258002969777754,
+      "lift_mean": 0.06254540951201844,
+      "lift_ci": [
+        0.052440561354523685,
+        0.07317995578664446
+      ],
+      "p_value_one_sided": 0.0,
+      "n_boot": 2000
+    }
+  },
+  "cost_operating_point_full": {
+    "threshold": 0.07,
+    "expected_cost": 254760.0,
+    "fn": 139,
+    "fp": 4979,
+    "tp": 2150,
+    "cost_per_claim": 25.476,
+    "do_nothing_cost": 915600.0,
+    "savings_vs_do_nothing": 660840.0
+  }
+}

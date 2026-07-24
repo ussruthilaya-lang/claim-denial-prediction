@@ -14,7 +14,7 @@ the structured/text feature set before retraining. Retrieval is
 training split, and each query self-excludes its own claim, so no claim is
 ever matched against itself or against future data. A **leaky-index
 variant** (index includes test claims) is deliberately also reported, scored
-at AUROC 0.973 vs. the valid 0.795 — presented as a cautionary contrast
+at AUROC 0.969 vs. the valid 0.795 — presented as a cautionary contrast
 showing what an invalid pipeline would look like, not a result.
 
 A second, deeper extension applies the same retrieval philosophy one level
@@ -88,10 +88,10 @@ Phase 4's base generator already made and stated for its own data.
 
 | Model | AUROC | Note |
 |---|---|---|
-| Structured XGBoost | 0.742 | baseline |
-| + Retrieval features | **0.766** | recovers latent per-provider denial propensity |
-| Oracle ceiling | 0.869 | max recoverable given the injected label rule |
-| Leaky index (invalid, reported as contrast) | 0.973 | what you'd wrongly report if the index leaked test claims |
+| Structured XGBoost | 0.733 | baseline |
+| + Retrieval features | **0.755** | recovers latent per-provider denial propensity |
+| Oracle ceiling | 0.883 | max recoverable given the injected label rule |
+| Leaky index (invalid, reported as contrast) | 0.969 | what you'd wrongly report if the index leaked test claims |
 
 Evidence-completeness extension, 150 cases:
 
