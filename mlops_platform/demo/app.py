@@ -209,24 +209,28 @@ def results_tab(art):
     c3.metric("Savings vs. no model", f"${cop['savings_vs_do_nothing']:,.0f}",
               help="Total saved across the test set vs. reviewing nothing.")
 
+    st.divider()
     st.markdown("**How each phase of the project adds up**")
     if UNIFIED_FIG.exists():
-        st.image(str(UNIFIED_FIG), use_column_width=True,
-                 caption="One linked dataset, four models: structured billing data (Phases 1–2) is "
-                         "the baseline; the clinical note (Phase 3) and retrieval over past claims "
-                         "(Phase 4) each add signal, and using both is best — all bounded by the "
-                         "oracle ceiling (the most any model could recover). Higher AUROC = better.")
+        chart, notes = st.columns([3, 2], gap="large")
+        chart.image(str(UNIFIED_FIG), use_column_width=True)
+        notes.markdown(
+            "One linked dataset, four models — **higher AUROC = better**:\n\n"
+            "- **Structured billing data** (Phases 1–2): **0.733** — the baseline\n"
+            "- **+ clinical note** (Phase 3): **0.769** — the note adds signal the form misses\n"
+            "- **+ retrieval** over past claims (Phase 4): **0.755**\n"
+            "- **Both together**: **0.795** — best\n\n"
+            "The dashed line is the **oracle ceiling (0.883)** — the most any model "
+            "could recover on this data.")
+        notes.caption("The live scorer in **Check a claim** is the structured + "
+                      "retrieval (Phase 4) model.")
     else:
         st.info("Run `python scripts/run_all_phases.py` to generate the cross-phase figure.")
-    st.caption("The live scorer in **Check a claim** is the structured + retrieval (Phase 4) model.")
 
     with st.expander("Technical detail — Phase 4 diagnostics (for reviewers)"):
-        p = FIG / "ablation_auroc.png"
-        if p.exists():
-            st.image(str(p), use_column_width=True,
-                     caption="Phase 4 detail: retrieval lift, the oracle ceiling, and the leaky-index "
-                             "trap — what you'd wrongly report if the retrieval index saw test claims.")
-        figs = [("shap_bar.png", "What drives the prediction (green = retrieval features)"),
+        figs = [("ablation_auroc.png",
+                 "Phase 4 ablation — retrieval lift, oracle ceiling, and the leaky-index trap"),
+                ("shap_bar.png", "What drives the prediction (green = retrieval features)"),
                 ("calibration.png", "Calibration — predicted vs. actual denial rate"),
                 ("cost_curve.png", "Cost-sensitive operating point"),
                 ("noise_sweep.png", "Robustness when labels are noisy"),
