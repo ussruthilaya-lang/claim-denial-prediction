@@ -50,6 +50,16 @@ work or only novel work — Phase 3 depends on Phase 2's classifier, so Het
 Phase 4 plus the demo site is the platform-facing track, sized to match a
 single phase plus a scoped-down (not full MLOps) presentation layer.
 
+**Phase 4 extension (in progress):** a second, requirement-level RAG layered
+on top of the claim-level one above — instead of retrieving similar past
+claims, it retrieves whether a specific payer requirement (sourced from real
+CMS LCD policies) is satisfied, omitted, or unsupported by the patient's
+record. Scoped to 2 procedure families (advanced imaging, PT/rehab). Same
+non-deviation logic as the base phase: same retrieval rigor (leakage-safe,
+cited rationale), applied one level deeper, targeting the same 2 instructor
+feedback points (proxy-label validation, real-vs-synthetic population
+harmonization). Status and numbers tracked in [TRACKER.md](TRACKER.md).
+
 Preliminary result (Phase 1 sanity check, Kaggle notebook): logistic
 regression and Random Forest on structured fields alone both plateau at
 ROC AUC ≈ 0.5 — confirms structured-only features are insufficient and

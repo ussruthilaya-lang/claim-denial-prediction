@@ -83,6 +83,43 @@ SHAP (top feature is a retrieval feature); **label-noise sweep + recover-the-rul
 explicitly. faiss and LLM SDKs are optional (numpy retrieval backend + mock
 rationale), so it runs on any machine with no external services.
 
+## Phase 4 extension — requirement-level evidence RAG (2026-07-24, in-progress)
+
+Sruthilaya is extending Phase 4 with a second, deeper RAG: instead of
+retrieving similar *claims*, this retrieves whether a specific LCD
+*requirement* is satisfied by the patient's record. Scoped to 2 procedure
+families (advanced imaging, PT/rehab), it targets the same 2 pieces of
+instructor feedback that Phase 4's headline ablation already addresses —
+proxy-label validation and real-vs-synthetic population harmonization —
+applied one level deeper (requirement, not claim). Same retrieval rigor
+(leakage-safe, cited rationale) — not a new deviation, an extension of the
+existing one.
+
+Verified 2026-07-24 by re-running both retrievers end-to-end against
+`evidence_data_gen.py`'s 150 cases:
+
+| Method | Accuracy | Notes |
+|---|---|---|
+| TF-IDF baseline (`evidence_retriever.py`) | 0.800 | Fails on paraphrased/indirect evidence (IMG-3/4/5) — zero lexical overlap |
+| Semantic (`evidence_retriever_semantic.py`, all-MiniLM-L6-v2) | 0.827 | Fixes IMG-4/5 (paraphrase); new failures on IMG-2/3 (abstract requirement phrasing vs. concrete clinical text) |
+
+Score separation (semantic, `rec_score`): complete/omitted mean **0.525** vs.
+unsupported mean **0.258** — clean separation despite the IMG-2/3 failure
+mode.
+
+Done: `evidence_policies.py` (10 real CMS LCD-derived requirements, 2
+families), `evidence_data_gen.py` (150 fault-injected cases, 50/50/50 split),
+both retrievers above, `artifacts/ablation_summary.json`.
+
+Not yet done, in priority order:
+1. Gold-check subset — hand-verify ~15-20 of 150 auto-generated labels, report agreement % (feedback #1 framing)
+2. Point existing `harmonization.py` PSI/KS report at this new patient population vs. Phase 1-2's (feedback #2)
+3. Confusion matrix + score-distribution + PSI figures, same palette as `plots.py`
+4. Cited deficiency report function (status + cited chunk + requirement text), mirroring `llm_demo.py`'s pattern
+5. Demo app integration — new tab in `mlops_platform/demo/app.py` alongside the existing claim-denial demo
+6. Data provenance paragraph — CMS LCD text is real/sourced; patient records are Synthea-schema-realistic but not literally downloaded (no internet access in build environment) — disclosed as a scope decision, not hidden
+7. Report writeup — non-deviation framing, scope cuts (3-class not 5, 2 families not 4, ~150 not 1,200 cases, manual requirement extraction not auto-decomposition), IMG-4/5-fixed vs. IMG-2/3-still-fail as the headline finding
+
 ## Week 1 (2026-07-15 → 2026-07-21) — real data, ported code, working models
 
 | Deliverable | Owner | Due | Status | Notes |
