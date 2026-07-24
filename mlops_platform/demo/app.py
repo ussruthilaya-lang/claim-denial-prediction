@@ -45,6 +45,9 @@ from phase4_rag_agentic.src.retriever import ClaimRetriever
 
 ART = ROOT / "phase4_rag_agentic" / "artifacts"
 FIG = ART / "figures"
+# Cross-phase ladder (structured -> +text -> +retrieval -> +both); written by
+# scripts/run_all_phases.py to the repo-level artifacts/ dir.
+UNIFIED_FIG = ROOT / "artifacts" / "unified_ablation.png"
 
 # Claim-level risk bands (Score a claim).
 BAND_COLOR = {"HIGH": "#d03b3b", "ELEVATED": "#fab219", "LOW": "#0ca30c"}
@@ -206,14 +209,23 @@ def results_tab(art):
     c3.metric("Savings vs. no model", f"${cop['savings_vs_do_nothing']:,.0f}",
               help="Total saved across the test set vs. reviewing nothing.")
 
-    st.markdown("**Does adding retrieval actually help?**")
-    p = FIG / "ablation_auroc.png"
-    if p.exists():
-        st.image(str(p), use_column_width=True,
-                 caption="Structured billing data + retrieval flags more denials than either "
-                         "alone (higher AUROC = better; the dashed line is the best achievable).")
+    st.markdown("**How each phase of the project adds up**")
+    if UNIFIED_FIG.exists():
+        st.image(str(UNIFIED_FIG), use_column_width=True,
+                 caption="One linked dataset, four models: structured billing data (Phases 1–2) is "
+                         "the baseline; the clinical note (Phase 3) and retrieval over past claims "
+                         "(Phase 4) each add signal, and using both is best — all bounded by the "
+                         "oracle ceiling (the most any model could recover). Higher AUROC = better.")
+    else:
+        st.info("Run `python scripts/run_all_phases.py` to generate the cross-phase figure.")
+    st.caption("The live scorer in **Check a claim** is the structured + retrieval (Phase 4) model.")
 
-    with st.expander("Technical detail — full model diagnostics (for reviewers)"):
+    with st.expander("Technical detail — Phase 4 diagnostics (for reviewers)"):
+        p = FIG / "ablation_auroc.png"
+        if p.exists():
+            st.image(str(p), use_column_width=True,
+                     caption="Phase 4 detail: retrieval lift, the oracle ceiling, and the leaky-index "
+                             "trap — what you'd wrongly report if the retrieval index saw test claims.")
         figs = [("shap_bar.png", "What drives the prediction (green = retrieval features)"),
                 ("calibration.png", "Calibration — predicted vs. actual denial rate"),
                 ("cost_curve.png", "Cost-sensitive operating point"),
