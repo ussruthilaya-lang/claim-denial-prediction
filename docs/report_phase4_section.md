@@ -138,6 +138,53 @@ real property of the method worth reporting on its own.
 - Re-attempt real MIMIC-IV-Note / Synthea credentialing for a real-data
   validation pass over the synthetic result.
 
+## References (Phase 4 + extension — merge with team's combined list)
+
+[1] Centers for Medicare & Medicaid Services. *Local Coverage Determination
+(LCD) L34220 / L37281: Magnetic Resonance Imaging of the Spine.* CMS
+Medicare Coverage Database. https://www.cms.gov/medicare-coverage-database
+
+[2] Centers for Medicare & Medicaid Services. *Local Coverage Determination
+(LCD) L33942 / Medicare Part B Therapy Documentation Standards.* CMS
+Medicare Coverage Database. https://www.cms.gov/medicare-coverage-database
+
+[3] Reimers, N. and Gurevych, I. *Sentence-BERT: Sentence Embeddings using
+Siamese BERT-Networks.* EMNLP-IJCNLP, 2019. (Basis for
+`sentence-transformers/all-MiniLM-L6-v2`, used for the semantic evidence
+retriever.)
+
+[4] Chen, T. and Guestrin, C. *XGBoost: A Scalable Tree Boosting System.*
+KDD, 2016. (Structured classifier used in the Phase 4 ablation.)
+
+[5] Lundberg, S. and Lee, S. *A Unified Approach to Interpreting Model
+Predictions.* NeurIPS, 2017. (SHAP, used for Phase 4 feature attribution.)
+
+[6] Centers for Medicare & Medicaid Services. *ACA Marketplace claims
+denial statistics, 2024.* (Basis for the ~19% denial-prevalence
+calibration used by the synthetic label generator.)
+
+## Appendix (Phase 4 + extension)
+
+**Code:** [github.com/&lt;team-org-or-username&gt;/claim-denial-prediction](https://github.com) — `phase4_rag_agentic/` (retrieval-augmented
+prediction + evidence-completeness extension), `mlops_platform/demo/` (demo app).
+*(Replace with the actual repo URL before submission.)*
+
+**Setup:**
+```bash
+pip install -e .
+pip install -r phase4_rag_agentic/requirements.txt
+pip install -r mlops_platform/requirements.txt
+
+python scripts/run_phase4.py          # trains + writes Phase 4 artifacts
+streamlit run mlops_platform/demo/app.py   # interactive demo, all 3 tabs
+```
+
+**Additional figures:** confusion matrices and score-separation histogram
+for the evidence extension are in `phase4_rag_agentic/artifacts/figures/`
+(`evidence_confusion_tfidf.png`, `evidence_confusion_semantic.png`,
+`evidence_score_distribution.png`), alongside the core Phase 4 figures
+(ablation, calibration, cost curve, SHAP, noise sweep, harmonization).
+
 ---
 
 ## AI Prompts Used — Sruthilaya's session (Phase 4 + extension)
