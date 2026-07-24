@@ -96,6 +96,35 @@ def _icd_options():
     return [c for codes in ICD10.values() for c in codes]
 
 
+def _claim_card(claim):
+    """Render a claim as a clean, always-visible key/value card (no dropdown)."""
+    filing_days = (claim.submission_date - claim.service_date).days
+    rows = [
+        ("Provider", claim.provider_id),
+        ("Diagnosis (ICD-10)", claim.icd10_code),
+        ("Procedure (CPT)",
+         f"{claim.cpt_code} — {PROCEDURE_BY_CPT[claim.cpt_code].label}"),
+        ("Insurance", claim.insurance_type),
+        ("Billed amount", f"${claim.billed_amount:,.2f}"),
+        ("Service date", pd.Timestamp(claim.service_date).strftime("%Y-%m-%d")),
+        ("Submission date", pd.Timestamp(claim.submission_date).strftime("%Y-%m-%d")),
+        ("Days to file", str(filing_days)),
+    ]
+    cells = "".join(
+        "<div style='display:flex;justify-content:space-between;gap:12px;padding:5px 0;"
+        "border-bottom:1px solid rgba(128,128,128,0.15)'>"
+        f"<span style='color:#8a8f98'>{k}</span>"
+        f"<span style='font-weight:600;text-align:right'>{v}</span></div>"
+        for k, v in rows)
+    st.markdown(
+        "<div style='padding:14px 18px;border:1px solid rgba(128,128,128,0.3);"
+        "border-radius:12px'>"
+        "<div style='font-size:0.8rem;color:#8a8f98;letter-spacing:.03em'>CLAIM RECORD</div>"
+        f"<div style='font-size:1.25rem;font-weight:700;margin-bottom:8px'>{claim.claim_id}</div>"
+        f"{cells}</div>",
+        unsafe_allow_html=True)
+
+
 # ───────────────────────────── Tab 1: Check a claim ─────────────────────────
 def score_tab(art, test):
     st.caption("Estimate how likely a claim is to be **denied** before you submit it — "
@@ -130,35 +159,17 @@ def score_tab(art, test):
                 "service_date": pd.Timestamp(svc), "submission_date": sub,
                 "reason_code": None, "denied": None}))
 
-        with st.expander("Claim details", expanded=False):
-            filing_days = (claim.submission_date - claim.service_date).days
-            fields = pd.DataFrame([
-                {"field": "Claim ID", "value": claim.claim_id},
-                {"field": "Provider", "value": claim.provider_id},
-                {"field": "Diagnosis (ICD-10)", "value": claim.icd10_code},
-                {"field": "Procedure (CPT)",
-                 "value": f"{claim.cpt_code} — {PROCEDURE_BY_CPT[claim.cpt_code].label}"},
-                {"field": "Insurance", "value": claim.insurance_type},
-                {"field": "Billed amount", "value": f"${claim.billed_amount:,.2f}"},
-                {"field": "Service date", "value": str(claim.service_date)},
-                {"field": "Submission date", "value": str(claim.submission_date)},
-                {"field": "Days to file", "value": str(filing_days)},
-            ])
-            st.dataframe(fields, use_container_width=True, hide_index=True,
-                        column_config={"field": st.column_config.TextColumn(width="medium"),
-                                       "value": st.column_config.TextColumn(width="medium")})
-
         go = st.button("Assess denial risk", type="primary", use_container_width=True)
 
     with right:
+        _claim_card(claim)
         if not go:
-            st.info("👈 Choose or build a claim, then **Assess denial risk**. "
-                    "You'll get a risk score, the reason, and what to fix.")
+            st.caption("Click **Assess denial risk** (on the left) to score this claim.")
             return
         ds = explain_claim(art, claim)
         color = BAND_COLOR[ds.risk_band]
         st.markdown(
-            f"<div style='padding:18px;border-radius:12px;background:{color}18;"
+            f"<div style='margin-top:14px;padding:18px;border-radius:12px;background:{color}18;"
             f"border:1px solid {color}'>"
             f"<span style='font-size:2.8rem;font-weight:800;color:{color}'>"
             f"{ds.denial_probability:.0%}</span> "
@@ -320,15 +331,14 @@ def evidence_tab():
     r1.metric("TF-IDF — keyword match", f"{summary['tfidf_baseline_accuracy']:.1%}")
     r2.metric("Semantic — meaning match", f"{summary['semantic_method_accuracy']:.1%}")
     st.caption("Semantic retrieval catches paraphrased evidence that keyword matching misses.")
-    with st.expander("Detailed results — confusion matrices & score separation"):
-        fig_cols = st.columns(3)
-        for i, (fname, caption) in enumerate([
-            ("evidence_confusion_tfidf.png", "TF-IDF confusion matrix"),
-            ("evidence_confusion_semantic.png", "Semantic confusion matrix"),
-            ("evidence_score_distribution.png", "Score separation (semantic)")]):
-            p = FIG / fname
-            if p.exists():
-                fig_cols[i].image(str(p), caption=caption, use_column_width=True)
+    fig_cols = st.columns(3)
+    for i, (fname, caption) in enumerate([
+        ("evidence_confusion_tfidf.png", "TF-IDF confusion matrix"),
+        ("evidence_confusion_semantic.png", "Semantic confusion matrix"),
+        ("evidence_score_distribution.png", "Score separation (semantic)")]):
+        p = FIG / fname
+        if p.exists():
+            fig_cols[i].image(str(p), caption=caption, use_column_width=True)
 
 
 def main():
