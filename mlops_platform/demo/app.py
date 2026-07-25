@@ -9,7 +9,7 @@ a technical reviewer can still drill in.
 Three tabs:
   1. Check a claim        — denial risk + why + suggested fix (retrieval-augmented).
   2. How well it works    — accuracy / cost / savings, with full diagnostics on demand.
-  3. Check the documentation — the evidence-completeness extension: is a payer
+  3. Required documentation — the evidence-completeness extension: is a payer
      requirement supported by the record, and was that evidence submitted?
 
 Run:  streamlit run mlops_platform/demo/app.py
@@ -29,7 +29,8 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from phase4_rag_agentic.src.data_gen import ICD10, PROCEDURE_BY_CPT, row_to_claim
+from phase4_rag_agentic.src.data_gen import (_DX_PHRASES, ICD10,
+                                             PROCEDURE_BY_CPT, row_to_claim)
 from phase4_rag_agentic.src.evidence_data_gen import generate_cases
 from phase4_rag_agentic.src.evidence_policies import ALL_POLICIES
 from phase4_rag_agentic.src.evidence_report import explain_case
@@ -51,13 +52,7 @@ UNIFIED_FIG = ROOT / "artifacts" / "unified_ablation.png"
 
 # Claim-level risk bands (Score a claim).
 BAND_COLOR = {"HIGH": "#d03b3b", "ELEVATED": "#fab219", "LOW": "#0ca30c"}
-BAND_LABEL = {"HIGH": "High risk", "ELEVATED": "Elevated risk", "LOW": "Low risk"}
-VERDICT_TEXT = {
-    "HIGH": "Likely to be denied — review and fix it before submitting.",
-    "ELEVATED": "Some denial risk — a quick review is worth it.",
-    "LOW": "Looks clean — likely to be paid.",
-}
-# Evidence-completeness statuses (Check the documentation).
+# Evidence-completeness statuses (Required documentation).
 STATUS_COLOR = {"complete": "#0ca30c", "omitted": "#fab219", "unsupported": "#d03b3b"}
 STATUS_LABEL = {"complete": "Documentation complete",
                 "omitted": "Evidence omitted",
@@ -98,57 +93,69 @@ def _icd_options():
     return [c for codes in ICD10.values() for c in codes]
 
 
-def _claim_card(claim):
-    """Render a claim as a clean, always-visible key/value card (no dropdown)."""
-    filing_days = (claim.submission_date - claim.service_date).days
-    rows = [
-        ("Provider", claim.provider_id),
-        ("Diagnosis (ICD-10)", claim.icd10_code),
-        ("Procedure (CPT)",
-         f"{claim.cpt_code} — {PROCEDURE_BY_CPT[claim.cpt_code].label}"),
-        ("Insurance", claim.insurance_type),
-        ("Billed amount", f"${claim.billed_amount:,.2f}"),
-        ("Service date", pd.Timestamp(claim.service_date).strftime("%Y-%m-%d")),
-        ("Submission date", pd.Timestamp(claim.submission_date).strftime("%Y-%m-%d")),
-        ("Days to file", str(filing_days)),
-    ]
-    cells = "".join(
-        "<div style='display:flex;justify-content:space-between;gap:12px;padding:5px 0;"
-        "border-bottom:1px solid rgba(128,128,128,0.15)'>"
-        f"<span style='color:#6b7280'>{k}</span>"
-        f"<span style='font-weight:600;text-align:right'>{v}</span></div>"
-        for k, v in rows)
-    st.markdown(
-        "<div style='padding:14px 18px;border:1px solid rgba(128,128,128,0.3);"
-        "border-radius:12px'>"
-        "<div style='font-size:0.8rem;color:#6b7280;letter-spacing:.03em'>CLAIM RECORD</div>"
-        f"<div style='font-size:1.25rem;font-weight:700;margin-bottom:8px'>{claim.claim_id}</div>"
-        f"{cells}</div>",
-        unsafe_allow_html=True)
+def _clean_dx_label(phrase: str) -> str:
+    for article in ("an ", "a "):
+        if phrase.startswith(article):
+            phrase = phrase[len(article):]
+            break
+    return phrase[0].upper() + phrase[1:]
+
+
+# ICD-10 code -> human-readable diagnosis name, built from the same
+# category-ordered phrases data_gen.py uses to write clinical notes (so the
+# label always matches what the note actually says, no separate hardcoded list).
+_ICD_LABELS = {
+    code: _clean_dx_label(phrase)
+    for cat, codes in ICD10.items()
+    for code, phrase in zip(codes, _DX_PHRASES[cat])
+}
+
+# Requirement id (e.g. "PT-1", "IMG-1") -> its actual CMS LCD requirement
+# sentence, so the "Insurer requirement" picker doesn't show a bare code with
+# no indication of what it means.
+_REQ_TEXT = {req["req_id"]: req["text"]
+            for policy in ALL_POLICIES for req in policy["requirements"]}
+
+
+def _short_req_label(req_id: str, max_len: int = 55) -> str:
+    text = _REQ_TEXT[req_id]
+    return f"{req_id} — {text[:max_len]}{'…' if len(text) > max_len else ''}"
 
 
 # ───────────────────────────── Tab 1: Check a claim ─────────────────────────
 def score_tab(art, test):
-    st.caption("Estimate a claim's **denial risk** before you submit it — with the reason and a "
-               "fix. Uses the structured billing fields + similar past claims; the clinical note "
-               "is analyzed separately in **Check the documentation**.")
+    st.subheader("Score a claim for denial risk")
+    st.markdown(
+        "**What this does:** checks one insurance claim and estimates the "
+        "chance it gets denied, using past claims that looked similar.\n\n"
+        "**How to try it:**\n"
+        "1. On the left, leave **\"Pick a sample claim\"** selected and choose "
+        "any claim from the dropdown (they're sorted highest-risk first).\n"
+        "2. Click the **Assess denial risk** button.\n"
+        "3. The result appears on the right: a risk %, a plain-language reason, "
+        "a suggested action, and the past claims it was compared against.\n\n"
+        "(Or switch to **\"Build a claim\"** to type in your own claim details "
+        "instead of picking an existing one.)"
+    )
     left, right = st.columns([1, 1.4], gap="large")
 
     with left:
-        mode = st.radio("Start from", ["A sample claim", "Build my own"],
+        mode = st.radio("Claim source", ["Pick a sample claim", "Build a claim"],
                         horizontal=True)
-        if mode == "A sample claim":
+        if mode == "Pick a sample claim":
             sample = test.sort_values("prob_augmented", ascending=False).head(200)
             options = sample["claim_id"].tolist()
-            cid = st.selectbox("Sample claim (sorted by model risk)", options)
+            cid = st.selectbox("Claim (sorted by model risk)", options)
             row = test[test["claim_id"] == cid].iloc[0]
             claim = row_to_claim(row)
         else:
             payer = st.selectbox("Insurance", art.encoder.payers)
-            cpt = st.selectbox("Procedure (CPT)",
+            cpt = st.selectbox("CPT (procedure)",
                                [f"{c} — {PROCEDURE_BY_CPT[c].label}" for c in art.encoder.cpts])
             cpt = cpt.split(" — ")[0]
-            icd = st.selectbox("Diagnosis (ICD-10)", _icd_options())
+            icd = st.selectbox("ICD-10 (diagnosis)",
+                               [f"{c} — {_ICD_LABELS[c]}" for c in _icd_options()])
+            icd = icd.split(" — ")[0]
             provider = st.selectbox("Provider", art.encoder.providers)
             billed = st.number_input("Billed amount ($)", 20.0, 20000.0,
                                      float(PROCEDURE_BY_CPT[cpt].base_cost))
@@ -161,41 +168,36 @@ def score_tab(art, test):
                 "insurance_type": payer, "billed_amount": billed,
                 "service_date": pd.Timestamp(svc), "submission_date": sub,
                 "reason_code": None, "denied": None}))
-
-        go = st.button("Assess denial risk", type="primary", use_container_width=True)
+        go = st.button("Assess denial risk", type="primary")
 
     with right:
-        _claim_card(claim)
         if not go:
-            st.caption("Click **Assess denial risk** (on the left) to score this claim.")
             return
         ds = explain_claim(art, claim)
         color = BAND_COLOR[ds.risk_band]
         st.markdown(
-            f"<div style='margin-top:14px;padding:18px;border-radius:12px;background:{color}18;"
+            f"<div style='padding:16px;border-radius:10px;background:{color}22;"
             f"border:1px solid {color}'>"
-            f"<span style='font-size:2.8rem;font-weight:800;color:{color}'>"
+            f"<span style='font-size:2.4rem;font-weight:700;color:{color}'>"
             f"{ds.denial_probability:.0%}</span> "
-            f"<span style='font-size:1.15rem;color:{color};font-weight:700'>"
-            f"denial risk · {BAND_LABEL[ds.risk_band]}</span>"
-            f"<div style='margin-top:6px;font-size:1.02rem'>{VERDICT_TEXT[ds.risk_band]}</div>"
-            f"</div>",
+            f"<span style='font-size:1.1rem;color:{color};font-weight:600'>"
+            f"denial risk · {ds.risk_band}</span></div>",
             unsafe_allow_html=True)
-        st.markdown(f"**✅ What to do:** {ds.suggested_action}")
-        st.markdown(f"**💡 Why:** {ds.rationale}")
+        st.markdown(f"**Suggested action:** {ds.suggested_action}")
+        st.markdown(f"**Why:** {ds.rationale}")
 
-        with st.expander("See the evidence — similar past claims"):
-            ev = pd.DataFrame([{
-                "claim_id": e.claim.claim_id, "similarity": round(e.similarity, 3),
-                "provider": e.claim.provider_id, "payer": e.claim.insurance_type,
-                "cpt": e.claim.cpt_code, "billed": e.claim.billed_amount,
-                "outcome": "DENIED" if e.claim.denied else "paid",
-                "reason": e.claim.reason_code or "",
-            } for e in ds.evidence])
-            st.dataframe(ev, use_container_width=True, hide_index=True)
-            if ds.top_reasons:
-                st.caption("Most common denial reasons among these similar claims: "
-                           + " · ".join(f"{r} ({n})" for r, n in ds.top_reasons))
+        st.markdown("**Most similar past claims (retrieved evidence)**")
+        ev = pd.DataFrame([{
+            "claim_id": e.claim.claim_id, "similarity": round(e.similarity, 3),
+            "provider": e.claim.provider_id, "payer": e.claim.insurance_type,
+            "cpt": e.claim.cpt_code, "billed": e.claim.billed_amount,
+            "outcome": "DENIED" if e.claim.denied else "paid",
+            "reason": e.claim.reason_code or "",
+        } for e in ds.evidence])
+        st.dataframe(ev, use_container_width=True, hide_index=True)
+        if ds.top_reasons:
+            st.caption("Denial reasons in this neighbourhood: "
+                       + " · ".join(f"{r} ({n})" for r, n in ds.top_reasons))
 
 
 # ─────────────────────────── Tab 2: How well it works ───────────────────────
@@ -224,22 +226,22 @@ def results_tab(art):
             "_The \\$400 / \\$40 are illustrative cost assumptions, not billed amounts._")
 
     st.divider()
-    st.markdown("**How each phase of the project adds up**")
-    if UNIFIED_FIG.exists():
-        chart, notes = st.columns([3, 2], gap="large")
-        chart.image(str(UNIFIED_FIG), use_column_width=True)
-        notes.markdown(
-            "One linked dataset, four models — **higher AUROC = better**:\n\n"
-            "- **Structured billing data** (Phases 1–2): **0.733** — the baseline\n"
-            "- **+ clinical note** (Phase 3): **0.769** — the note adds signal the form misses\n"
-            "- **+ retrieval** over past claims (Phase 4): **0.755**\n"
-            "- **Both together**: **0.795** — best\n\n"
-            "The dashed line is the **oracle ceiling (0.883)** — the most any model "
-            "could recover on this data.")
-        notes.caption("The live scorer in **Check a claim** is the structured + "
-                      "retrieval (Phase 4) model.")
-    else:
-        st.info("Run `python scripts/run_all_phases.py` to generate the cross-phase figure.")
+    with st.expander("🔍 Check this to understand more — how each phase of the project adds up"):
+        if UNIFIED_FIG.exists():
+            chart, notes = st.columns([3, 2], gap="large")
+            chart.image(str(UNIFIED_FIG), use_column_width=True)
+            notes.markdown(
+                "One linked dataset, four models — **higher AUROC = better**:\n\n"
+                "- **Structured billing data** (Phases 1–2): **0.733** — the baseline\n"
+                "- **+ clinical note** (Phase 3): **0.769** — the note adds signal the form misses\n"
+                "- **+ retrieval** over past claims (Phase 4): **0.755**\n"
+                "- **Both together**: **0.795** — best\n\n"
+                "The dashed line is the **oracle ceiling (0.883)** — the most any model "
+                "could recover on this data.")
+            notes.caption("The live scorer in **Check a claim** is the structured + "
+                          "retrieval (Phase 4) model.")
+        else:
+            st.info("Run `python scripts/run_all_phases.py` to generate the cross-phase figure.")
 
     with st.expander("Technical detail — Phase 4 diagnostics (for reviewers)"):
         figs = [("ablation_auroc.png",
@@ -256,8 +258,7 @@ def results_tab(art):
                 cols[i % 2].image(str(fp), caption=caption, use_column_width=True)
 
 
-# ─────────────────────── Tab 3: Check the documentation ─────────────────────
-@st.cache_resource
+# ─────────────────────── Tab 3: Required documentation ──────────────────────
 def load_evidence_cases():
     cases = generate_cases()
     build_global_index(cases)  # fits the TF-IDF vectorizer once, globally
@@ -265,17 +266,41 @@ def load_evidence_cases():
 
 
 def evidence_tab():
-    st.caption("A separate check: does a claim's documentation actually support the insurer's "
-               "requirement — and was that evidence submitted, or left out?")
-    with st.expander("About this test bed (30-second scope)"):
-        st.write(
-            "A separate, narrower test from the denial model in the other tabs: for one "
-            "specific payer requirement, is it supported by the patient's record — and if so, "
-            "was that evidence actually submitted? 2 procedure families (lumbar-MRI imaging, "
-            "PT/rehab), 10 requirements paraphrased from real CMS LCD policy text, 150 synthetic "
-            "cases (50 per outcome) with an injected, hand-checked ground truth — a controlled "
-            "test bed, not a claim of production accuracy.")
+    st.markdown(
+        "**Why this matters:** payers don't only deny claims for lack of medical "
+        "necessity — many denials happen because a specific documentation requirement "
+        "wasn't met (e.g. *\"6 weeks of conservative therapy must be documented\"* before "
+        "an MRI is approved). Even when that evidence exists in the chart, the claim "
+        "still gets denied if it wasn't included in what was submitted. This check "
+        "catches that specific, avoidable failure *before* submission, one requirement "
+        "at a time: does the evidence exist, and was it actually sent with the claim?\n\n"
+        "**How this differs from \"Check a claim\":** that tab scores a whole claim's "
+        "overall denial risk as a percentage. This one zooms into a single documentation "
+        "requirement and gives a definitive answer — complete, evidence omitted, or "
+        "evidence unsupported — rather than a probability."
+    )
+    st.caption(
+        "Built from 2 real CMS LCD policy families (lumbar-MRI imaging, PT/rehab) with "
+        "10 requirements paraphrased from actual CMS documentation standards, scored "
+        "against 150 synthetic cases that each have a known, hand-injected correct "
+        "answer — a controlled test bed comparing two ways of finding evidence in a "
+        "chart (keyword search vs. meaning-based search), not a claim of production "
+        "accuracy."
+    )
+    st.markdown(
+        "**How to browse the 150 test cases:**\n"
+        "1. Pick a **Procedure type** — the 2 CMS policies this test bed covers "
+        "(\"Advanced imaging\" = lumbar MRI, \"PT / rehab\" = physical therapy).\n"
+        "2. Pick an **Insurer requirement** — each policy has 5, numbered 1st through 5th "
+        "(\"IMG-1\"..\"IMG-5\" for imaging, \"PT-1\"..\"PT-5\" for PT/rehab); the dropdown "
+        "shows what each one actually requires.\n"
+        "3. Pick an **Example case** — 5 synthetic patients × 3 outcomes each "
+        "(Complete / Omitted / Unsupported), each with a known correct answer.\n"
+        "4. Read the three panels below: what was actually submitted, what the system "
+        "found in the full record, and whether its verdict matches the known answer."
+    )
 
+    st.markdown("#### Browse the test cases")
     cases = load_evidence_cases()
     policy_by_id = {p["policy_id"]: p for p in ALL_POLICIES}
     families = sorted(policy_by_id, key=lambda pid: policy_by_id[pid]["family"])
@@ -286,12 +311,19 @@ def evidence_tab():
         format_func=lambda pid: FAMILY_LABEL.get(policy_by_id[pid]["family"],
                                                  policy_by_id[pid]["family"].replace("_", " ").title()))
     reqs = sorted({c["req_id"] for c in cases if c["policy_id"] == policy_id})
-    req_id = pick2.selectbox("Insurer requirement", reqs)
+    req_id = pick2.selectbox("Insurer requirement", reqs, format_func=_short_req_label)
+    # 5 synthetic patients x 3 outcomes each for this requirement, in that fixed
+    # order (see evidence_data_gen.generate_cases) — label each uniquely (patient
+    # + outcome) instead of by outcome alone, which repeated 5x and made every
+    # instance of "Complete"/"Omitted"/"Unsupported" indistinguishable.
     variants = [c for c in cases if c["policy_id"] == policy_id and c["req_id"] == req_id]
-    gold = pick3.selectbox("Example case", [c["gold_variant"] for c in variants],
-                           format_func=lambda v: v.capitalize(),
-                           help="A synthetic case with a known, injected correct answer.")
-    case = next(c for c in variants if c["gold_variant"] == gold)
+    labels = [f"Patient {i // 3 + 1} — {c['gold_variant'].capitalize()}"
+             for i, c in enumerate(variants)]
+    idx = pick3.selectbox("Example case", range(len(variants)),
+                         format_func=lambda i: labels[i],
+                         help="Each patient has 3 versions of this requirement — a synthetic "
+                              "case with a known, injected correct answer.")
+    case = variants[idx]
     tfidf_result = tfidf_classify(case)
     cache_before = semantic_cache_size()
     semantic_result = semantic_classify(case)
@@ -300,7 +332,7 @@ def evidence_tab():
 
     st.caption(f"{policy_by_id[policy_id]['source']}  ·  “{case['requirement_text']}”")
 
-    STAGE_H = 430
+    STAGE_H = 380
     stage1, stage2, stage3 = st.columns(3, gap="medium")
 
     with stage1:
@@ -353,21 +385,49 @@ def evidence_tab():
                 st.write(report.rationale)
 
     st.divider()
-    st.markdown("**How often is it right? (150 test cases)**")
+    st.markdown("### How often is it right? (150 test cases)")
     with open(ART / "ablation_summary.json") as f:
         summary = json.load(f)
     r1, r2 = st.columns(2)
     r1.metric("TF-IDF — keyword match", f"{summary['tfidf_baseline_accuracy']:.1%}")
     r2.metric("Semantic — meaning match", f"{summary['semantic_method_accuracy']:.1%}")
-    st.caption("Semantic retrieval catches paraphrased evidence that keyword matching misses.")
-    fig_cols = st.columns(3)
-    for i, (fname, caption) in enumerate([
-        ("evidence_confusion_tfidf.png", "TF-IDF confusion matrix"),
-        ("evidence_confusion_semantic.png", "Semantic confusion matrix"),
-        ("evidence_score_distribution.png", "Score separation (semantic)")]):
-        p = FIG / fname
-        if p.exists():
-            fig_cols[i].image(str(p), caption=caption, use_column_width=True)
+    st.caption("Semantic search (matches by *meaning*) catches paraphrased evidence that exact "
+              "keyword matching misses.")
+
+    with st.expander("🔍 Check this to understand more — see exactly where each method "
+                     "gets it right or wrong"):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.image(str(FIG / "evidence_confusion_tfidf.png"), use_column_width=True)
+            st.caption(
+                "Rows = the true answer, columns = what the method predicted — the diagonal "
+                "is correct. TF-IDF is cautious: it never wrongly claims evidence exists (the "
+                "bottom row, true 'unsupported', lands entirely in the 'unsupported' column). "
+                "But it misses 30 of the 100 cases where evidence really was in the chart, "
+                "calling them 'unsupported' just because the wording doesn't share enough "
+                "exact keywords."
+            )
+        with c2:
+            st.image(str(FIG / "evidence_confusion_semantic.png"), use_column_width=True)
+            st.caption(
+                "Same layout. Semantic search finds more of the real evidence (78 of 100 vs. "
+                "TF-IDF's 70) because it matches by meaning, not exact wording — but that "
+                "costs a little precision: in 4 cases it sees evidence that isn't actually "
+                "there (the small off-diagonal counts in the 'complete'/'omitted' columns), "
+                "something TF-IDF never does."
+            )
+
+        score_col, _ = st.columns([1, 1])
+        with score_col:
+            st.image(str(FIG / "evidence_score_distribution.png"), use_column_width=True)
+            st.caption(
+                "Why semantic search still makes mistakes: each case's best-match similarity "
+                "score, split by whether evidence actually existed (green) or not (red). The "
+                "two mostly separate — red mostly below ~0.35, green mostly above ~0.45 — but "
+                "they overlap in between. Cases that fall in that overlap band are exactly "
+                "the errors in the confusion matrices above: no single cutoff score sorts "
+                "every case correctly."
+            )
 
 
 def main():
@@ -383,7 +443,7 @@ def main():
         return
     art, test = load_artifacts()
 
-    t1, t2, t3 = st.tabs(["🔎 Check a claim", "📄 Check the documentation",
+    t1, t2, t3 = st.tabs(["🔎 Check a claim", "📄 Required documentation",
                           "📊 How well it works"])
     with t1:
         score_tab(art, test)
