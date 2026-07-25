@@ -1,0 +1,24 @@
+# Deployment manifest for the Streamlit demo (mlops_platform/demo/app.py) on
+# Streamlit Community Cloud, which installs from a root-level requirements.txt
+# by default. Combines mlops_platform/requirements.txt + phase4_rag_agentic/
+# requirements.txt (the only two the demo app actually imports) with versions
+# pinned to the exact combination verified crash-free all session — see
+# runtime.txt for the matching Python version pin.
+#
+# numpy/pyarrow are pinned because a newer combination (numpy 2.4.x + pyarrow
+# >=25 on Python 3.11) reproduced a real segfault inside Streamlit's internal
+# pandas->Arrow conversion (st.dataframe/st.image), caught via
+# streamlit.testing.v1.AppTest + faulthandler. numpy 2.0.2 + pyarrow 21.0.0 on
+# Python 3.9 ran cleanly through dozens of test cycles with no crash.
+streamlit==1.37.0
+pydantic==2.7.4
+pydantic-settings==2.3.4
+numpy==2.0.2
+pandas
+scikit-learn
+scipy
+xgboost
+shap
+matplotlib
+pyarrow==21.0.0
+sentence-transformers
