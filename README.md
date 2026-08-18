@@ -81,7 +81,8 @@ covered in detail per-phase and tracked live in [TRACKER.md](TRACKER.md).
   whole project's architecture before the real-data build began.
 - **Sruthilaya** — Phase 4 (retrieval-augmented prediction) and its
   requirement-level evidence-completeness extension, plus the demo/presentation
-  layer that ties every phase's results into one place.
+  layer that ties every phase's results into one place, and a FastAPI serving
+  layer with real health/metrics endpoints on top of it.
 
 ## Evaluation & rigor
 
@@ -111,6 +112,7 @@ Every phase reports, not just AUROC:
 ├── phase2_gbm_shap/       # Nainica — gradient boosting + SHAP
 ├── phase3_clinicalbert/   # Het — ClinicalBERT + GPT-4 zero-shot baseline
 ├── phase4_rag_agentic/    # Sruthilaya — retrieval-augmented prediction + evidence-completeness RAG
+│   └── api/               # FastAPI serving layer: /predict, /health, /metrics
 ├── shared/                # Everyone — claim schema, eval harness (AUROC/F1, cost-sensitive metrics, calibration)
 ├── mlops_platform/demo/   # Sruthilaya — Streamlit app presenting every phase's results (`make demo`)
 ├── docs/adr/              # architecture decisions, kept with their reasoning
@@ -133,6 +135,34 @@ python scripts/run_phase4.py
 # a results tab with every phase's figures
 streamlit run mlops_platform/demo/app.py
 ```
+
+## Serving Phase 4 as an API
+
+Beyond the notebook/demo, Phase 4's model is also served behind a real
+FastAPI endpoint — `/predict` (scores a claim, grounded in retrieved
+evidence), `/health` (reports whether the model is actually loaded, not
+just whether the process is up), and `/metrics` (real Prometheus counters
+and latency histograms, not illustrative numbers).
+
+```bash
+pip install -r phase4_rag_agentic/requirements.txt
+pip install -r phase4_rag_agentic/api/requirements.txt
+
+uvicorn phase4_rag_agentic.api.main:app --reload
+curl http://localhost:8000/health
+```
+
+Or containerized (build from the repo root, since the image needs
+`shared/` and the pretrained `artifacts/` alongside Phase 4's code):
+
+```bash
+docker build -f phase4_rag_agentic/Dockerfile -t phase4-api .
+docker run -p 8000:8000 phase4-api
+```
+
+The API serves the same pretrained artifacts the demo does — it never
+trains anything itself, so `python scripts/run_phase4.py` must be run at
+least once first.
 
 ## Status
 

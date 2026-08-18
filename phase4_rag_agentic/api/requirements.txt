@@ -1,0 +1,5 @@
+# API serving layer only — the model/pipeline requirements
+# (phase4_rag_agentic/requirements.txt) are still required underneath this.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+prometheus-client==0.20.0

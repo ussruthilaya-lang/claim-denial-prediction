@@ -62,6 +62,27 @@ conflating superficially different but conceptually related statements
 (the IMG-2/3 failure mode). Reporting both, rather than only the better
 one, is what makes this a methods comparison instead of a single number.
 
+### Deployment: serving the model behind a real API
+
+Beyond the notebook/demo path, Phase 4's trained model is also served
+behind a FastAPI application (`phase4_rag_agentic/api/`), so the pipeline's
+output is callable as a service, not only inspectable in a notebook or a
+Streamlit session. The API exposes three endpoints: `/predict` (scores a
+claim and returns the same retrieval-grounded rationale the demo produces —
+both paths call the identical `explain_claim` function, so they cannot
+silently diverge), `/health` (reports whether the model artifacts are
+actually loaded and which retrieval backend is active, not just whether the
+process is alive), and `/metrics` (real Prometheus counters and latency
+histograms per endpoint, verified to increment under live traffic rather
+than illustrative numbers). The API never trains anything itself — like the
+demo, it only serves the artifacts already produced and evaluated offline,
+so serving is decoupled from training the same way it would be in a real
+deployment. A Dockerfile containerizes the service; it installs the
+CPU-only PyTorch build before the rest of the dependencies, since
+`sentence-transformers` otherwise pulls in multi-hundred-megabyte CUDA
+packages that are unnecessary for CPU inference and materially bloat the
+image.
+
 ## Dataset & Inputs
 
 All four phases and this extension train on **one unified, controlled
@@ -179,6 +200,17 @@ python scripts/run_phase4.py          # trains + writes Phase 4 artifacts
 streamlit run mlops_platform/demo/app.py   # interactive demo, all 3 tabs
 ```
 
+**Serving the model as an API (optional, beyond the demo):**
+```bash
+pip install -r phase4_rag_agentic/api/requirements.txt
+uvicorn phase4_rag_agentic.api.main:app --reload
+curl http://localhost:8000/health
+
+# or containerized, built from the repo root:
+docker build -f phase4_rag_agentic/Dockerfile -t phase4-api .
+docker run -p 8000:8000 phase4-api
+```
+
 **Additional figures:** confusion matrices and score-separation histogram
 for the evidence extension are in `phase4_rag_agentic/artifacts/figures/`
 (`evidence_confusion_tfidf.png`, `evidence_confusion_semantic.png`,
@@ -266,3 +298,11 @@ for the evidence extension are in `phase4_rag_agentic/artifacts/figures/`
    match vs. learned meaning match), which is why both retrievers are
    reported side by side as the headline result rather than only the
    higher-accuracy one.
+8. **Deciding to make deployment real, not a skills-list claim.** Chose to
+   wrap the trained model in an actual FastAPI service with a genuine
+   `/metrics` endpoint (verified to increment under real traffic) rather
+   than describe deployment abstractly. Diagnosing why the first container
+   build failed — `sentence-transformers` pulling multi-GB CUDA wheels and
+   exhausting the build environment — led to explicitly installing a
+   CPU-only PyTorch build first, a concrete example of debugging a
+   dependency footprint rather than just retrying until something worked.
